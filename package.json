@@ -1,0 +1,42 @@
+{
+  "name": "unuerp-redesign",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:unit",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "check": "npm run lint && npm run typecheck && npm run test:unit && npm run build",
+    "optimize:images": "node scripts/optimize-hero-images.mjs"
+  },
+  "dependencies": {
+    "next": "16.2.10",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.61.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^24",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.2.10",
+    "jsdom": "^26.1.0",
+    "sharp": "^0.34.5",
+    "typescript": "^5",
+    "vitest": "^3.2.7"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
+  }
+}
