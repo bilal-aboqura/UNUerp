@@ -80,7 +80,7 @@ test("Arabic navigation order follows the localized information architecture", a
     "المزايا",
     "المنتجات",
     "القطاعات",
-    "الأسعار",
+    "الحلول والأسعار",
   ]);
 });
 

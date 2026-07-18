@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createWebhookPayload, validateDemoRequest } from "@/lib/demo-request";
+import { createPublicServerClient } from "@/lib/supabase/server";
 
 const windowMs = 15 * 60 * 1_000;
 const maxRequests = 5;
@@ -63,8 +64,24 @@ export async function POST(request: NextRequest) {
     userAgent: request.headers.get("user-agent"),
   });
 
+  const supabase = await createPublicServerClient();
+  let stored = false;
+  if (supabase) {
+    const { error } = await supabase.from("demo_requests").insert({
+      name: payload.name,
+      email: payload.email,
+      company: payload.company,
+      industry: payload.industry,
+      message: payload.message,
+      language: payload.language,
+      source_page: payload.sourcePage,
+    });
+    stored = !error;
+  }
+
   const webhookUrl = process.env.DEMO_REQUEST_WEBHOOK_URL;
   if (!webhookUrl) {
+    if (stored) return NextResponse.json({ ok: true, delivery: "database" });
     if (process.env.NODE_ENV === "production") {
       return NextResponse.json(
         { message: "Demo requests are temporarily unavailable. Please contact us by phone or email." },

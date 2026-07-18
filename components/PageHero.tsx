@@ -8,6 +8,7 @@ export function PageHero({
   variant = "features",
   locale = "en",
   cta,
+  mediaSrc,
 }: {
   signal: string;
   title: string;
@@ -15,6 +16,7 @@ export function PageHero({
   variant?: "features" | "products" | "industries" | "pricing" | "contact";
   locale?: "en" | "ar";
   cta?: { label: string; href: string };
+  mediaSrc?: string;
 }) {
   return (
     <section className={`page-hero ${variant}-visual`}>
@@ -25,7 +27,7 @@ export function PageHero({
           <p>{intro}</p>
           {cta && <Link className="button" href={cta.href}>{cta.label}<span aria-hidden="true">↗</span></Link>}
         </div>
-        <PageVisual variant={variant} locale={locale} />
+        <PageVisual variant={variant} locale={locale} src={mediaSrc} />
       </div>
     </section>
   );

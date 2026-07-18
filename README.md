@@ -14,6 +14,7 @@
 
 <p align="center">
   <a href="#what-this-site-delivers">What it delivers</a> &middot;
+  <a href="#production-admin-dashboard">Admin dashboard</a> &middot;
   <a href="#experience-map">Experience map</a> &middot;
   <a href="#technical-foundation">Technical foundation</a> &middot;
   <a href="#quality">Quality</a> &middot;
@@ -42,6 +43,7 @@ UNU ERP is positioned as an open, adaptable operating platform that brings finan
 | `/industries` | Industry-specific entry points and tailored detail pages. |
 | `/pricing` | Custom-pricing conversation path. |
 | `/contact` | Tailored demo request form and delivery feedback. |
+| `/admin` | Protected single-admin CMS for publishing all site content, imagery, products, industries, pricing, SEO, and enquiries. |
 
 Every primary route has an Arabic counterpart under `/ar`, including localized content, navigation, directionality, and calls to action.
 
@@ -68,6 +70,7 @@ The complete rationale, tokens, component vocabulary, and responsive rules live 
 | Form handling | Next.js route handler with validation, honeypot protection, rate limiting, and timeout-controlled webhook delivery |
 | Testing | Vitest, Testing Library, and Playwright |
 | Image workflow | `sharp`-powered image optimization script |
+| Content and auth | Supabase Postgres, Auth, Storage, and row-level security |
 
 ### Project Layout
 
@@ -95,6 +98,25 @@ npm run check
 
 `npm run check` runs linting, type checking, unit tests, and a production build. `npm run optimize:images` refreshes optimized hero imagery when source assets change.
 
+## Production Admin Dashboard
+
+The `/admin` dashboard publishes changes immediately. It controls bilingual page copy, navigation, footer and contact details, products and software screenshots, features, industries, pricing, SEO, homepage sections, and uploaded media. Demo requests are stored in the admin enquiry inbox, where the admin can update status and notes.
+
+1. Create a Supabase project and copy `.env.example` to `.env.local`.
+2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+3. Run [`supabase/migrations/202607180001_admin_cms.sql`](supabase/migrations/202607180001_admin_cms.sql) in the Supabase SQL editor.
+4. Create the one administrator in Supabase Authentication.
+5. Add that Auth user's UUID to the allowlist:
+
+```sql
+insert into public.admin_users (user_id)
+values ('YOUR_AUTH_USER_UUID');
+```
+
+The first successful save seeds the live `site_content` record from the website's built-in content. Public pages keep using that built-in content if Supabase is temporarily unavailable. Uploaded JPG, PNG, WebP, and AVIF images are stored in the public `site-media` bucket with a 10 MB limit.
+
+For local UI review without Supabase, development mode supports `/admin?preview=1`. This preview cannot publish or upload and is unavailable in production.
+
 ## Demo Request Delivery
 
 Demo requests are deliberately handled on the server. Input is validated before delivery, suspicious honeypot submissions are safely accepted without forwarding, and submissions are rate-limited by client address.
@@ -104,7 +126,7 @@ Demo requests are deliberately handled on the server. Input is validated before 
 | `DEMO_REQUEST_WEBHOOK_URL` | Approved server-side endpoint that receives sanitized demo requests. |
 | `DEMO_REQUEST_WEBHOOK_TOKEN` | Optional secret for authenticating the server-to-server webhook request. |
 
-These variables must never use a `NEXT_PUBLIC_` prefix. Without a configured webhook, development submissions are logged in sanitized form; production returns an honest unavailable response instead of claiming a request was delivered.
+These variables must never use a `NEXT_PUBLIC_` prefix. With Supabase configured, the request is stored in the admin enquiry inbox before optional webhook forwarding. Without Supabase, the existing webhook remains the delivery fallback.
 
 For the Google Sheets webhook contract, Apps Script implementation, and security notes, see [docs/google-sheets-webhook.md](docs/google-sheets-webhook.md).
 

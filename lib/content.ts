@@ -67,7 +67,7 @@ export const nav = [
   { label: "Features", href: "/features" },
   { label: "Products", href: "/products" },
   { label: "Industries", href: "/industries" },
-  { label: "Pricing", href: "/pricing" },
+  { label: "Solutions & Pricing", href: "/pricing" },
 ];
 export const slugify = (value: string) =>
   value

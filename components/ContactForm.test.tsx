@@ -71,4 +71,24 @@ describe("ContactForm", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Too many requests.");
   });
+
+  it("includes quote sizing details in the submitted context", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.spyOn(global, "fetch").mockImplementation(successfulResponse);
+    render(<ContactForm variant="quote" />);
+
+    await user.type(screen.getByLabelText("Full name *"), "Ada Lovelace");
+    await user.type(screen.getByLabelText("Work email *"), "ada@example.com");
+    await user.type(screen.getByLabelText("Company *"), "UNU Labs");
+    await user.type(screen.getByLabelText("Phone number *"), "+966500000000");
+    await user.selectOptions(screen.getByLabelText("Number of employees"), "51–200");
+    await user.selectOptions(screen.getByLabelText("Number of branches"), "6–20");
+    await user.click(screen.getByRole("button", { name: "Request a quote" }));
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(String(request.body)) as { message: string };
+    expect(body.message).toContain("Employees: 51–200");
+    expect(body.message).toContain("Branches: 6–20");
+  });
 });

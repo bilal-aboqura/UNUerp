@@ -3,8 +3,9 @@ import Link from "next/link";
 import { Page } from "@/components/Shell";
 import { CommandCenter } from "@/components/ProductVisuals";
 import { modules, products, slugify } from "@/lib/content";
+import type { SiteContent } from "@/lib/site-content";
 
-const homeCopy = {
+export const homeCopy = {
   en: {
     badge: "One connected operating system",
     title: "One platform for your entire business",
@@ -157,9 +158,19 @@ const homeCopy = {
   },
 } as const;
 
-export function HomePage({ locale = "en" }: { locale?: "en" | "ar" }) {
+export function HomePage({
+  locale = "en",
+  content,
+  siteContent,
+  media,
+}: {
+  locale?: "en" | "ar";
+  content?: (typeof homeCopy)["en"] | (typeof homeCopy)["ar"];
+  siteContent?: SiteContent["global"];
+  media?: SiteContent["media"];
+}) {
   const ar = locale === "ar";
-  const copy = homeCopy[locale];
+  const copy = content ?? homeCopy[locale];
   const prefix = ar ? "/ar" : "";
   const industrySlugs = [
     "manufacturing", "automotive", "fashion-and-apparel", "food-and-beverage",
@@ -167,7 +178,7 @@ export function HomePage({ locale = "en" }: { locale?: "en" | "ar" }) {
   ];
 
   return (
-    <Page locale={locale}>
+    <Page locale={locale} content={siteContent}>
       <section className="hero home-hero">
         <div className="hero-orbit" aria-hidden="true" />
         <div className="wrap hero-copy">
@@ -199,7 +210,7 @@ export function HomePage({ locale = "en" }: { locale?: "en" | "ar" }) {
           </div>
           <div className="proof-logos">
             {[1, 2, 3, 4, 5, 6].map((logo) => (
-              <Image key={logo} src={`/assets/client-${logo}.png`} alt={ar ? `شعار عميل UNU رقم ${logo}` : `UNU client logo ${logo}`} width={128} height={62} sizes="96px" />
+              <Image key={logo} src={media?.clientLogos[logo - 1]?.src ?? `/assets/client-${logo}.png`} alt={ar ? media?.clientLogos[logo - 1]?.altAr ?? `شعار عميل UNU رقم ${logo}` : media?.clientLogos[logo - 1]?.altEn ?? `UNU client logo ${logo}`} width={128} height={62} sizes="96px" />
             ))}
           </div>
         </div>
@@ -320,7 +331,7 @@ export function HomePage({ locale = "en" }: { locale?: "en" | "ar" }) {
       <section className="industry-story">
         <div className="wrap industry-story-grid">
           <div className="industry-photo" data-reveal style={{ position: "relative" }}>
-            <Image src="/assets/hero-industries.webp" alt={ar ? "فريق عمليات يستخدم بيانات مترابطة في مستودع" : "Operations team using connected data in a warehouse"} fill sizes="(max-width: 900px) 100vw, 50vw" />
+            <Image src={media?.industriesHero ?? "/assets/hero-industries.webp"} alt={ar ? "فريق عمليات يستخدم بيانات مترابطة في مستودع" : "Operations team using connected data in a warehouse"} fill sizes="(max-width: 900px) 100vw, 50vw" />
             <span>{ar ? "من أرض الواقع إلى لوحة الإدارة" : "From day-to-day operations to better decisions"}</span>
           </div>
           <div className="industry-story-copy" data-reveal>

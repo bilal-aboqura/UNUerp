@@ -2,7 +2,13 @@
 
 import { FormEvent, useState } from "react";
 
-export function ContactForm({ locale = "en" }: { locale?: "en" | "ar" }) {
+export function ContactForm({
+  locale = "en",
+  variant = "demo",
+}: {
+  locale?: "en" | "ar";
+  variant?: "demo" | "quote";
+}) {
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [error, setError] = useState("");
   const [developmentDelivery, setDevelopmentDelivery] = useState(false);
@@ -14,6 +20,17 @@ export function ContactForm({ locale = "en" }: { locale?: "en" | "ar" }) {
     if (status === "submitting" || !form.reportValidity()) return;
 
     const values = new FormData(form);
+    const quoteContext =
+      variant === "quote"
+        ? [
+            values.get("message"),
+            values.get("phone") && `Phone: ${values.get("phone")}`,
+            values.get("employees") && `Employees: ${values.get("employees")}`,
+            values.get("branches") && `Branches: ${values.get("branches")}`,
+          ]
+            .filter(Boolean)
+            .join(" | ")
+        : values.get("message");
     setStatus("submitting");
     setError("");
     void fetch("/api/demo-requests", {
@@ -21,6 +38,7 @@ export function ContactForm({ locale = "en" }: { locale?: "en" | "ar" }) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         ...Object.fromEntries(values),
+        message: quoteContext,
         locale,
         sourcePage: window.location.pathname,
       }),
@@ -134,6 +152,35 @@ export function ContactForm({ locale = "en" }: { locale?: "en" | "ar" }) {
           ))}
         </select>
       </label>
+      {variant === "quote" && (
+        <>
+          <label>
+            {arabic ? "رقم الهاتف" : "Phone number"} <span aria-hidden="true">*</span>
+            <input
+              name="phone"
+              type="tel"
+              autoComplete="tel"
+              required
+              maxLength={30}
+              placeholder={arabic ? "+966 5X XXX XXXX" : "+1 555 000 0000"}
+            />
+          </label>
+          <label>
+            {arabic ? "عدد الموظفين" : "Number of employees"}
+            <select name="employees" defaultValue="">
+              <option value="" disabled>{arabic ? "اختر النطاق" : "Select a range"}</option>
+              {["1–10", "11–50", "51–200", "201–500", "+500"].map((range) => <option key={range}>{range}</option>)}
+            </select>
+          </label>
+          <label>
+            {arabic ? "عدد الفروع" : "Number of branches"}
+            <select name="branches" defaultValue="">
+              <option value="" disabled>{arabic ? "اختر العدد" : "Select a range"}</option>
+              {["1", "2–5", "6–20", "+20"].map((range) => <option key={range}>{range}</option>)}
+            </select>
+          </label>
+        </>
+      )}
       <label className="wide">
         {arabic ? "ما الذي ترغب في تحسينه؟" : "What would you like to improve?"}
         <textarea
@@ -166,9 +213,13 @@ export function ContactForm({ locale = "en" }: { locale?: "en" | "ar" }) {
           ? arabic
             ? "جارٍ إرسال الطلب…"
             : "Sending request…"
-          : arabic
-            ? "إرسال طلب العرض"
-            : "Send my demo request"}
+          : variant === "quote"
+            ? arabic
+              ? "احصل على عرض سعر"
+              : "Request a quote"
+            : arabic
+              ? "إرسال طلب العرض"
+              : "Send my demo request"}
       </button>
     </form>
   );

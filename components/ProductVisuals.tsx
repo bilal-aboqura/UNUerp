@@ -154,16 +154,16 @@ export function DetailVisual({
   );
 }
 
-export function PageVisual({ variant, locale = "en" }: { variant: string; locale?: "en" | "ar" }) {
+export function PageVisual({ variant, locale = "en", src: providedSrc }: { variant: string; locale?: "en" | "ar"; src?: string }) {
   const ar = locale === "ar";
   if (["features", "products", "industries"].includes(variant)) {
-    const src = `/assets/hero-${variant}.webp`;
+    const src = providedSrc ?? `/assets/hero-${variant}.webp`;
     const alt = ar
       ? variant === "industries" ? "فريق عمليات في مستودع مترابط" : variant === "products" ? "فريق أعمال سعودي يعمل على أنظمة UNU" : "فريق يراجع لوحة تحليلات الأعمال"
       : variant === "industries" ? "Operations team working from shared warehouse data" : variant === "products" ? "Saudi business team working together with UNU products" : "Business team reviewing connected operational analytics";
     return (
       <div className="page-photo" style={{ position: "relative" }}>
-        <Image src={src} alt={alt} fill sizes="(max-width: 900px) 100vw, 44vw" />
+        <Image src={src} alt={alt} fill priority sizes="(max-width: 900px) 100vw, 44vw" />
         <span>{ar ? "مصمم لعمليات المنطقة" : "Designed for regional operations"}</span>
       </div>
     );

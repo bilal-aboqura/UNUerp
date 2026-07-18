@@ -1,15 +1,9 @@
 import { Page } from "@/components/Shell";
-import { EnglishProducts } from "@/components/ArabicCatalogs";
-import { PageHero } from "@/components/PageHero";
-export default function Products() {
-  return (
-    <Page>
-      <PageHero variant="products" signal="Our products" title="Specialized systems. One UNU philosophy." intro="Extend connected operations into finance, communication, healthcare, customer flow and retail." cta={{ label: "Talk to a product expert", href: "/contact" }} />
-      <section className="section ar-catalog-section">
-        <div className="wrap">
-          <EnglishProducts />
-        </div>
-      </section>
-    </Page>
-  );
+import { EnglishProductsPage } from "@/components/EnglishMarketing";
+import { readSiteContent } from "@/lib/site-content";
+
+export default async function Products() {
+  const site = await readSiteContent();
+  const catalog = Object.values(site.products).map((item) => item.catalog.en) as unknown as { slug: string; name: string; tag: string; title: string; text: string; items: string[] }[];
+  return <Page content={site.global}><EnglishProductsPage catalog={catalog} pageContent={site.pages.products.en} /></Page>;
 }
