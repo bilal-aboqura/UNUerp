@@ -219,9 +219,9 @@ export function ArabicProductDetail({ page, image, imageAlt }: { page: ArabicPro
       <section className="section ar-feature-matrix">
         <div className="wrap ar-feature-matrix-grid">
           <div>
-            <span>نطاق العمل</span>
-            <h2>قدرات يومية واضحة لفرق التشغيل والإدارة</h2>
-            <p>تُحدد الوحدات والتكاملات النهائية بعد فهم إجراءات العمل والأنظمة الحالية.</p>
+            <span>{page.featuresLabel ?? "نطاق العمل"}</span>
+            <h2>{page.featuresTitle ?? "قدرات يومية واضحة لفرق التشغيل والإدارة"}</h2>
+            <p>{page.featuresIntro ?? "تُحدد الوحدات والتكاملات النهائية بعد فهم إجراءات العمل والأنظمة الحالية."}</p>
           </div>
           <ul>{page.features.map((feature) => <li key={feature}><i aria-hidden="true">✓</i>{feature}</li>)}</ul>
         </div>
@@ -230,7 +230,7 @@ export function ArabicProductDetail({ page, image, imageAlt }: { page: ArabicPro
       <section className="section ar-workflow-section">
         <div className="wrap">
           <header className="ar-section-head compact">
-            <div><span>كيف يعمل؟</span><h2>رحلة واحدة يمكن متابعتها من البداية إلى النتيجة</h2></div>
+            <div><span>{page.workflowLabel ?? "كيف يعمل؟"}</span><h2>{page.workflowTitle ?? "رحلة واحدة يمكن متابعتها من البداية إلى النتيجة"}</h2>{page.workflowIntro ? <p>{page.workflowIntro}</p> : null}</div>
           </header>
           <ol className="ar-workflow">
             {page.workflow.map((step, index) => <li key={step}><span>{index + 1}</span><strong>{step}</strong></li>)}
@@ -241,13 +241,13 @@ export function ArabicProductDetail({ page, image, imageAlt }: { page: ArabicPro
       <section className="section ar-fit-section">
         <div className="wrap ar-fit-grid">
           <article>
-            <span>مناسب لـ</span>
-            <h2>مصمم لفرق تعمل في سياق حقيقي</h2>
+            <span>{page.audiencesLabel ?? "مناسب لـ"}</span>
+            <h2>{page.audiencesTitle ?? "مصمم لفرق تعمل في سياق حقيقي"}</h2>
             <div className="ar-token-list">{page.audiences.map((item) => <b key={item}>{item}</b>)}</div>
           </article>
           <article>
-            <span>التكاملات</span>
-            <h2>يعمل ضمن بيئة أعمالك</h2>
+            <span>{page.integrationsLabel ?? "التكاملات"}</span>
+            <h2>{page.integrationsTitle ?? "يعمل ضمن بيئة أعمالك"}</h2>
             <div className="ar-token-list is-dark">{page.integrations.map((item) => <b key={item}>{item}</b>)}</div>
           </article>
         </div>
@@ -255,15 +255,40 @@ export function ArabicProductDetail({ page, image, imageAlt }: { page: ArabicPro
 
       <section className="section ar-faq-section">
         <div className="wrap ar-faq-grid">
-          <div><span>الأسئلة الشائعة</span><h2>إجابات قبل جلسة العرض</h2><p>نعرض ما يمكن تأكيده الآن، ويُحسم نطاق التنفيذ والتكامل بعد مراجعة احتياجاتك.</p></div>
+          <div><span>{page.faqLabel ?? "الأسئلة الشائعة"}</span><h2>{page.faqTitle ?? "إجابات قبل جلسة العرض"}</h2><p>{page.faqIntro ?? "نعرض ما يمكن تأكيده الآن، ويُحسم نطاق التنفيذ والتكامل بعد مراجعة احتياجاتك."}</p></div>
           <div className="ar-faq-list">
             {page.faq.map((item) => <details key={item.question}><summary>{item.question}</summary><p>{item.answer}</p></details>)}
           </div>
         </div>
       </section>
 
-      <ArabicCta title={page.ctaTitle} text={page.ctaText} />
+      {page.demoVideo?.src ? <ArabicProductVideo page={page} /> : <ArabicCta title={page.ctaTitle} text={page.ctaText} />}
     </>
+  );
+}
+
+function ArabicProductVideo({ page }: { page: ArabicProductPage }) {
+  const video = page.demoVideo;
+  if (!video?.src) return null;
+  const videoType = /\.webm(\?|$)/i.test(video.src) ? "video/webm" : /\.(mov|qt)(\?|$)/i.test(video.src) ? "video/quicktime" : "video/mp4";
+  return (
+    <section className="ar-product-video" aria-labelledby="product-video-title">
+      <div className="wrap ar-product-video-grid">
+        <div className="ar-product-video-frame">
+          <video controls playsInline preload="metadata" poster={video.poster || undefined} aria-label={video.title}>
+            <source src={video.src} type={videoType} />
+            متصفحك لا يدعم تشغيل الفيديو.
+          </video>
+          <span className="ar-product-video-live"><i /> عرض توضيحي</span>
+        </div>
+        <div className="ar-product-video-copy">
+          <span>شاهدها أثناء العمل</span>
+          <h2 id="product-video-title">{video.title || page.ctaTitle}</h2>
+          <p>{video.description || page.ctaText}</p>
+          <div className="actions"><Link className="button" href="/ar/contact">طلب عرض توضيحي <Arrow /></Link><a className="button secondary" href="mailto:info@unuerp.com">تواصل مع فريق المبيعات</a></div>
+        </div>
+      </div>
+    </section>
   );
 }
 

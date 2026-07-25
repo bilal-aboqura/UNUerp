@@ -66,8 +66,15 @@ function setAtPath(target: unknown, path: (string | number)[], value: unknown) {
   cursor[path.at(-1)!] = value;
 }
 
-function isImageKey(key: string, value: string) {
+function isImageKey(key: string, value: string, mediaKind?: "image" | "video") {
+  if (mediaKind === "video") return false;
+  if (mediaKind === "image") return true;
   return /(^src$|image|logo|hero)/i.test(key) && !/alt/i.test(key) && (/^(\/|https?:)/.test(value) || value === "");
+}
+
+function isVideoKey(key: string, value: string, mediaKind?: "image" | "video") {
+  if (mediaKind === "image") return false;
+  return mediaKind === "video" || /video/i.test(key) || /\.(mp4|webm|mov)(\?|$)/i.test(value);
 }
 
 function EditorField({
@@ -75,11 +82,13 @@ function EditorField({
   value,
   onChange,
   onUpload,
+  mediaKind,
 }: {
   fieldKey: string;
   value: JsonValue;
   onChange: (value: JsonValue) => void;
   onUpload: (file: File) => Promise<string | null>;
+  mediaKind?: "image" | "video";
 }) {
   const label = titleFromKey(fieldKey);
   if (typeof value === "boolean") {
@@ -91,7 +100,8 @@ function EditorField({
   if (typeof value !== "string") return null;
 
   const multiline = value.length > 100 || /(intro|description|text|answer|note|tagline|legal)/i.test(fieldKey);
-  const image = isImageKey(fieldKey, value);
+  const image = isImageKey(fieldKey, value, mediaKind);
+  const video = isVideoKey(fieldKey, value, mediaKind);
 
   async function upload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -105,10 +115,11 @@ function EditorField({
     <label className={`admin-field${image ? " admin-image-field" : ""}`}>
       <span>{label}</span>
       {multiline ? <textarea rows={4} value={value} onChange={(event) => onChange(event.target.value)} /> : <input value={value} onChange={(event) => onChange(event.target.value)} />}
-      {image ? (
+      {image || video ? (
         <>
-          {value ? <img className="admin-image-preview" src={value} alt="" /> : null}
-          <span className="admin-upload-button">Upload image<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={upload} /></span>
+          {value && video ? <video className="admin-image-preview admin-video-preview" src={value} controls preload="metadata" /> : null}
+          {value && image ? <img className="admin-image-preview" src={value} alt="" /> : null}
+          <span className="admin-upload-button">{video ? "Upload video" : "Upload image"}<input type="file" accept={video ? "video/mp4,video/webm,video/quicktime" : "image/jpeg,image/png,image/webp,image/avif"} onChange={upload} /></span>
         </>
       ) : null}
     </label>
@@ -120,11 +131,13 @@ function ContentEditor({
   onChange,
   onUpload,
   depth = 0,
+  mediaKind,
 }: {
   value: JsonValue;
   onChange: (value: JsonValue) => void;
   onUpload: (file: File) => Promise<string | null>;
   depth?: number;
+  mediaKind?: "image" | "video";
 }) {
   if (Array.isArray(value)) {
     const primitive = value.every((item) => ["string", "number", "boolean"].includes(typeof item));
@@ -134,11 +147,11 @@ function ContentEditor({
         {value.map((item, index) => (
           <div className={primitive ? "admin-array-row" : "admin-array-object"} key={index}>
             {primitive ? (
-              <EditorField fieldKey={`Item ${index + 1}`} value={item} onUpload={onUpload} onChange={(next) => { const copy = clone(value); copy[index] = next; onChange(copy); }} />
+              <EditorField fieldKey={`Item ${index + 1}`} value={item} mediaKind={mediaKind} onUpload={onUpload} onChange={(next) => { const copy = clone(value); copy[index] = next; onChange(copy); }} />
             ) : (
               <details open={index === 0}>
                 <summary>{typeof item === "object" && item && !Array.isArray(item) && "title" in item ? String(item.title) : `Entry ${index + 1}`}</summary>
-                <ContentEditor value={item} onUpload={onUpload} depth={depth + 1} onChange={(next) => { const copy = clone(value); copy[index] = next; onChange(copy); }} />
+                <ContentEditor value={item} onUpload={onUpload} depth={depth + 1} mediaKind={mediaKind} onChange={(next) => { const copy = clone(value); copy[index] = next; onChange(copy); }} />
               </details>
             )}
             <button className="admin-danger-link" type="button" onClick={() => onChange(value.filter((_, itemIndex) => itemIndex !== index))}>Delete {primitive ? "item" : "entry"}</button>
@@ -154,13 +167,14 @@ function ContentEditor({
     <div className={`admin-object admin-object-depth-${Math.min(depth, 2)}`}>
       {Object.entries(value).map(([key, item]) => {
         const nested = item !== null && typeof item === "object";
+        const childMediaKind = /poster|image|logo/i.test(key) ? "image" : (mediaKind === "video" && key === "src") || /video/i.test(key) ? "video" : undefined;
         return nested ? (
           <section className="admin-editor-section" key={key}>
             <h3>{titleFromKey(key)}</h3>
-            <ContentEditor value={item} onUpload={onUpload} depth={depth + 1} onChange={(next) => { const copy = clone(value); copy[key] = next; onChange(copy); }} />
+            <ContentEditor value={item} onUpload={onUpload} depth={depth + 1} mediaKind={childMediaKind} onChange={(next) => { const copy = clone(value); copy[key] = next; onChange(copy); }} />
           </section>
         ) : (
-          <EditorField key={key} fieldKey={key} value={item} onUpload={onUpload} onChange={(next) => { const copy = clone(value); copy[key] = next; onChange(copy); }} />
+          <EditorField key={key} fieldKey={key} value={item} mediaKind={childMediaKind} onUpload={onUpload} onChange={(next) => { const copy = clone(value); copy[key] = next; onChange(copy); }} />
         );
       })}
     </div>
@@ -219,18 +233,18 @@ export function AdminDashboard({
     setStatus({ tone: "dirty", message: "Unsaved changes" });
   }
 
-  async function uploadImage(file: File) {
+  async function uploadMedia(file: File) {
     setStatus({ tone: "saving", message: `Uploading ${file.name}…` });
     const form = new FormData();
     form.append("file", file);
     const response = await fetch("/api/admin/media", { method: "POST", body: form });
     const result = await response.json() as MediaAsset & { message?: string };
     if (!response.ok) {
-      setStatus({ tone: "error", message: result.message ?? "Image upload failed." });
+      setStatus({ tone: "error", message: result.message ?? "Media upload failed." });
       return null;
     }
     setMedia((current) => [result, ...current]);
-    setStatus({ tone: "dirty", message: "Image uploaded. Save to publish it." });
+    setStatus({ tone: "dirty", message: "Media uploaded. Save to publish it." });
     return result.public_url;
   }
 
@@ -283,22 +297,23 @@ export function AdminDashboard({
   if (tab === "overview") {
     editor = <Overview content={content} media={media} enquiries={enquiries} onNavigate={setTab} />;
   } else if (tab === "homepage") {
-    editor = <><PanelHeader title="Homepage" body="Edit the complete homepage in both languages, including all section copy and media." /><LocaleTabs locale={locale} onChange={setLocale} /><ContentEditor value={content.home[locale] as unknown as JsonValue} onUpload={uploadImage} onChange={(value) => update(["home", locale], value)} /><section className="admin-editor-section"><h3>Homepage media</h3><ContentEditor value={content.media as unknown as JsonValue} onUpload={uploadImage} onChange={(value) => update(["media"], value)} /></section></>;
+    editor = <><PanelHeader title="Homepage" body="Edit the complete homepage in both languages, including all section copy and media." /><LocaleTabs locale={locale} onChange={setLocale} /><ContentEditor value={content.home[locale] as unknown as JsonValue} onUpload={uploadMedia} onChange={(value) => update(["home", locale], value)} /><section className="admin-editor-section"><h3>Homepage media</h3><ContentEditor value={content.media as unknown as JsonValue} onUpload={uploadMedia} onChange={(value) => update(["media"], value)} /></section></>;
   } else if (tab === "products") {
     const current = content.products[selectedProduct];
-    editor = <><PanelHeader title="Products" body="Manage product cards, full product pages, software imagery, FAQs, workflows, and integrations." action={<ResourceSelect value={selectedProduct} options={Object.keys(content.products)} onChange={setSelectedProduct} />} /><LocaleTabs locale={locale} onChange={setLocale} />{current ? <><section className="admin-editor-section"><h3>Catalog card</h3><ContentEditor value={current.catalog[locale]} onUpload={uploadImage} onChange={(value) => update(["products", selectedProduct, "catalog", locale], value)} /></section><section className="admin-editor-section"><h3>Product page</h3><ContentEditor value={current[locale]} onUpload={uploadImage} onChange={(value) => update(["products", selectedProduct, locale], value)} /></section><section className="admin-editor-section"><h3>Dashboard replacement image</h3><p className="admin-editor-help">Upload a real product screenshot here to replace the illustrated dashboard in the product hero. Keep the image blank to use the illustration.</p><ContentEditor value={{ image: current.image, imageAlt: current.imageAlt[locale] }} onUpload={uploadImage} onChange={(value) => { const item = value as { image: string; imageAlt: string }; updateMany([{ path: ["products", selectedProduct, "image"], value: item.image }, { path: ["products", selectedProduct, "imageAlt", locale], value: item.imageAlt }]); }} /></section></> : null}</>;
+    const productPage = current?.[locale] as unknown as { demoVideo?: JsonValue } | undefined;
+    editor = <><PanelHeader title="Products" body="Manage product cards, full product pages, editable section copy, FAQs, workflows, and product media." action={<ResourceSelect value={selectedProduct} options={Object.keys(content.products)} onChange={setSelectedProduct} />} /><LocaleTabs locale={locale} onChange={setLocale} />{current ? <><section className="admin-editor-section"><h3>Catalog card</h3><ContentEditor value={current.catalog[locale]} onUpload={uploadMedia} onChange={(value) => update(["products", selectedProduct, "catalog", locale], value)} /></section><section className="admin-editor-section"><h3>Product page</h3><ContentEditor value={current[locale]} onUpload={uploadMedia} onChange={(value) => update(["products", selectedProduct, locale], value)} /></section><section className="admin-editor-section"><h3>Product demo video</h3><p className="admin-editor-help">Upload a replacement video here. The video is shown in the product detail page; leave the URL empty to keep the standard call-to-action.</p><ContentEditor value={productPage?.demoVideo ?? { src: "", poster: "", title: "", description: "" }} mediaKind="video" onUpload={uploadMedia} onChange={(value) => update(["products", selectedProduct, locale, "demoVideo"], value)} /></section><section className="admin-editor-section"><h3>Dashboard replacement image</h3><p className="admin-editor-help">Upload a real product screenshot here to replace the illustrated dashboard in the product hero. Keep the image blank to use the illustration.</p><ContentEditor value={{ image: current.image, imageAlt: current.imageAlt[locale] }} onUpload={uploadMedia} onChange={(value) => { const item = value as { image: string; imageAlt: string }; updateMany([{ path: ["products", selectedProduct, "image"], value: item.image }, { path: ["products", selectedProduct, "imageAlt", locale], value: item.imageAlt }]); }} /></section></> : null}</>;
   } else if (tab === "features") {
     const current = content.features[selectedFeature];
-    editor = <><PanelHeader title="Features" body="Edit every ERP capability, benefit, headline, and localized description." action={<ResourceSelect value={selectedFeature} options={Object.keys(content.features)} onChange={setSelectedFeature} />} /><LocaleTabs locale={locale} onChange={setLocale} />{current ? <ContentEditor value={current[locale] as unknown as JsonValue} onUpload={uploadImage} onChange={(value) => update(["features", selectedFeature, locale], value)} /> : null}</>;
+    editor = <><PanelHeader title="Features" body="Edit every ERP capability, benefit, headline, and localized description." action={<ResourceSelect value={selectedFeature} options={Object.keys(content.features)} onChange={setSelectedFeature} />} /><LocaleTabs locale={locale} onChange={setLocale} />{current ? <ContentEditor value={current[locale] as unknown as JsonValue} onUpload={uploadMedia} onChange={(value) => update(["features", selectedFeature, locale], value)} /> : null}</>;
   } else if (tab === "industries") {
     const current = content.industries[selectedIndustry];
-    editor = <><PanelHeader title="Industries" body="Manage industry names, summaries, detailed page copy, and imagery." action={<ResourceSelect value={selectedIndustry} options={Object.keys(content.industries)} onChange={setSelectedIndustry} />} /><LocaleTabs locale={locale} onChange={setLocale} />{current ? <><ContentEditor value={current[locale] as unknown as JsonValue} onUpload={uploadImage} onChange={(value) => update(["industries", selectedIndustry, locale], value)} /><section className="admin-editor-section"><h3>Industry media</h3><ContentEditor value={{ image: current.image }} onUpload={uploadImage} onChange={(value) => update(["industries", selectedIndustry, "image"], (value as { image: string }).image)} /></section></> : null}</>;
+    editor = <><PanelHeader title="Industries" body="Manage industry names, summaries, detailed page copy, and imagery." action={<ResourceSelect value={selectedIndustry} options={Object.keys(content.industries)} onChange={setSelectedIndustry} />} /><LocaleTabs locale={locale} onChange={setLocale} />{current ? <><ContentEditor value={current[locale] as unknown as JsonValue} onUpload={uploadMedia} onChange={(value) => update(["industries", selectedIndustry, locale], value)} /><section className="admin-editor-section"><h3>Industry media</h3><ContentEditor value={{ image: current.image }} onUpload={uploadMedia} onChange={(value) => update(["industries", selectedIndustry, "image"], (value as { image: string }).image)} /></section></> : null}</>;
   } else if (tab === "media") {
-    editor = <MediaLibrary media={media} onUpload={uploadImage} onDelete={(id) => setMedia((items) => items.filter((item) => item.id !== id))} />;
+    editor = <MediaLibrary media={media} onUpload={uploadMedia} onDelete={(id) => setMedia((items) => items.filter((item) => item.id !== id))} />;
   } else if (tab === "enquiries") {
     editor = <EnquiryInbox enquiries={enquiries} onChange={setEnquiries} />;
   } else {
-    editor = <><PanelHeader title="Settings" body="Manage site identity, SEO, navigation, contact details, page headers, and pricing content." /><section className="admin-editor-section"><h3>Global settings</h3><ContentEditor value={content.global as unknown as JsonValue} onUpload={uploadImage} onChange={(value) => update(["global"], value)} /></section><section className="admin-editor-section"><h3>Page headers</h3><ContentEditor value={content.pages as unknown as JsonValue} onUpload={uploadImage} onChange={(value) => update(["pages"], value)} /></section><section className="admin-editor-section"><h3>Pricing content</h3><ContentEditor value={content.pricing as unknown as JsonValue} onUpload={uploadImage} onChange={(value) => update(["pricing"], value)} /></section></>;
+    editor = <><PanelHeader title="Settings" body="Manage site identity, SEO, navigation, contact details, page headers, and pricing content." /><section className="admin-editor-section"><h3>Global settings</h3><ContentEditor value={content.global as unknown as JsonValue} onUpload={uploadMedia} onChange={(value) => update(["global"], value)} /></section><section className="admin-editor-section"><h3>Page headers</h3><ContentEditor value={content.pages as unknown as JsonValue} onUpload={uploadMedia} onChange={(value) => update(["pages"], value)} /></section><section className="admin-editor-section"><h3>Pricing content</h3><ContentEditor value={content.pricing as unknown as JsonValue} onUpload={uploadMedia} onChange={(value) => update(["pricing"], value)} /></section></>;
   }
 
   return (
@@ -332,10 +347,10 @@ function Overview({ content, media, enquiries, onNavigate }: { content: SiteCont
 }
 
 function MediaLibrary({ media, onUpload, onDelete }: { media: MediaAsset[]; onUpload: (file: File) => Promise<string | null>; onDelete: (id: string) => void }) {
-  const [message, setMessage] = useState("Upload JPG, PNG, WebP, or AVIF files up to 10 MB.");
+  const [message, setMessage] = useState("Upload images or MP4/WebM videos up to 100 MB.");
   async function upload(event: ChangeEvent<HTMLInputElement>) { const file = event.target.files?.[0]; if (!file) return; setMessage(`Uploading ${file.name}…`); const url = await onUpload(file); setMessage(url ? `${file.name} is ready to use.` : "Upload failed. Try again."); event.target.value = ""; }
   async function remove(id: string) { if (!window.confirm("Delete this media asset? Existing page references may stop working.")) return; const response = await fetch(`/api/admin/media?id=${encodeURIComponent(id)}`, { method: "DELETE" }); if (response.ok) onDelete(id); }
-  return <><PanelHeader title="Media library" body={message} action={<label className="admin-primary admin-file-action">Upload media<input type="file" accept="image/*" onChange={upload} /></label>} />{media.length ? <div className="admin-media-grid">{media.map((asset) => <article key={asset.id}><img src={asset.public_url} alt={asset.alt_en || asset.name} loading="lazy" /><div><strong>{asset.name}</strong><span>{Math.max(1, Math.round(asset.size_bytes / 1024))} KB</span></div><button type="button" onClick={() => void navigator.clipboard.writeText(asset.public_url)}>Copy URL</button><button className="admin-danger-link" type="button" onClick={() => void remove(asset.id)}>Delete</button></article>)}</div> : <p className="admin-empty">No uploaded assets yet. Existing images in the project remain available.</p>}</>;
+  return <><PanelHeader title="Media library" body={message} action={<label className="admin-primary admin-file-action">Upload media<input type="file" accept="image/*,video/mp4,video/webm,video/quicktime" onChange={upload} /></label>} />{media.length ? <div className="admin-media-grid">{media.map((asset) => <article key={asset.id}>{asset.mime_type.startsWith("video/") ? <video src={asset.public_url} controls preload="metadata" /> : <img src={asset.public_url} alt={asset.alt_en || asset.name} loading="lazy" />}<div><strong>{asset.name}</strong><span>{Math.max(1, Math.round(asset.size_bytes / 1024))} KB · {asset.mime_type.startsWith("video/") ? "Video" : "Image"}</span></div><button type="button" onClick={() => void navigator.clipboard.writeText(asset.public_url)}>Copy URL</button><button className="admin-danger-link" type="button" onClick={() => void remove(asset.id)}>Delete</button></article>)}</div> : <p className="admin-empty">No uploaded assets yet. Existing images in the project remain available.</p>}</>;
 }
 
 function EnquiryInbox({ enquiries, onChange }: { enquiries: Enquiry[]; onChange: (items: Enquiry[]) => void }) {

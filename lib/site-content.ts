@@ -127,8 +127,50 @@ function defaultProducts(): SiteContent["products"] {
     Object.keys(englishProductPages).map((slug) => [
       slug,
       {
-        en: englishProductPages[slug] as unknown as JsonValue,
-        ar: arabicProductPages[slug] as unknown as JsonValue,
+        en: {
+          ...(englishProductPages[slug] as unknown as Record<string, JsonValue>),
+          featuresLabel: "Operational scope",
+          featuresTitle: "Practical daily capabilities for teams and management",
+          featuresIntro: "Final modules and integrations are defined after reviewing your workflows and current systems.",
+          workflowLabel: "How it works",
+          workflowTitle: "One journey you can follow from first action to final outcome",
+          workflowIntro: "Keep each operating step visible, connected, and ready for review.",
+          audiencesLabel: "Built for",
+          audiencesTitle: "Teams working in real operating contexts",
+          integrationsLabel: "Integrations",
+          integrationsTitle: "Designed to work within your business environment",
+          faqLabel: "Frequently asked questions",
+          faqTitle: "Answers before your walkthrough",
+          faqIntro: "We explain what can be confirmed now. Implementation and integration scope are finalized after reviewing your needs.",
+          demoVideo: {
+            src: slug === "exchange" ? "/assets/unu-exchange.mp4" : "",
+            poster: "/assets/hero-products.webp",
+            title: englishProductPages[slug]?.ctaTitle ?? "See the product in action",
+            description: englishProductPages[slug]?.ctaText ?? "See how the workflow comes together in one connected platform.",
+          },
+        } as unknown as JsonValue,
+        ar: {
+          ...(arabicProductPages[slug] as unknown as Record<string, JsonValue>),
+          featuresLabel: "نطاق العمل",
+          featuresTitle: "قدرات يومية واضحة لفرق التشغيل والإدارة",
+          featuresIntro: "تُحدد الوحدات والتكاملات النهائية بعد فهم إجراءات العمل والأنظمة الحالية.",
+          workflowLabel: "كيف يعمل؟",
+          workflowTitle: "رحلة واحدة يمكن متابعتها من البداية إلى النتيجة",
+          workflowIntro: "اجعل كل خطوة تشغيلية واضحة ومترابطة وقابلة للمراجعة.",
+          audiencesLabel: "مناسب لـ",
+          audiencesTitle: "مصمم لفرق تعمل في سياق حقيقي",
+          integrationsLabel: "التكاملات",
+          integrationsTitle: "يعمل ضمن بيئة أعمالك",
+          faqLabel: "الأسئلة الشائعة",
+          faqTitle: "إجابات قبل جلسة العرض",
+          faqIntro: "نعرض ما يمكن تأكيده الآن، ويُحسم نطاق التنفيذ والتكامل بعد مراجعة احتياجاتك.",
+          demoVideo: {
+            src: slug === "exchange" ? "/assets/unu-exchange.mp4" : "",
+            poster: "/assets/hero-products.webp",
+            title: arabicProductPages[slug]?.ctaTitle ?? "شاهد المنتج أثناء العمل",
+            description: arabicProductPages[slug]?.ctaText ?? "شاهد كيف تترابط خطوات العمل داخل منصة واحدة.",
+          },
+        } as unknown as JsonValue,
         catalog: {
           en: enCatalog[slug] as unknown as JsonValue,
           ar: arCatalog[slug] as unknown as JsonValue,
@@ -265,6 +307,17 @@ export function cloneDefaultSiteContent(): SiteContent {
   return JSON.parse(JSON.stringify(defaultSiteContent)) as SiteContent;
 }
 
+function mergeContent(base: JsonValue, override: JsonValue): JsonValue {
+  if (Array.isArray(base) || Array.isArray(override) || base === null || override === null) return override;
+  if (typeof base !== "object" || typeof override !== "object") return override;
+
+  const result: Record<string, JsonValue> = { ...base };
+  Object.entries(override).forEach(([key, value]) => {
+    result[key] = key in result ? mergeContent(result[key], value) : value;
+  });
+  return result;
+}
+
 export const readSiteContent = cache(async (): Promise<SiteContent> => {
   const supabase = await createPublicServerClient();
   if (!supabase) return cloneDefaultSiteContent();
@@ -276,5 +329,5 @@ export const readSiteContent = cache(async (): Promise<SiteContent> => {
     .maybeSingle();
 
   if (error || !data?.content) return cloneDefaultSiteContent();
-  return data.content as SiteContent;
+  return mergeContent(defaultSiteContent as unknown as JsonValue, data.content as JsonValue) as unknown as SiteContent;
 });

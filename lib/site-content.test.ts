@@ -9,6 +9,10 @@ describe("site content model", () => {
     expect(defaultSiteContent.home.en.title).toBeTruthy();
     expect(defaultSiteContent.home.ar.title).toBeTruthy();
     expect(defaultSiteContent.media.clientLogos).toHaveLength(6);
+    expect(defaultSiteContent.products.exchange.ar).toMatchObject({
+      workflowTitle: "رحلة واحدة يمكن متابعتها من البداية إلى النتيجة",
+      demoVideo: { src: "/assets/unu-exchange.mp4" },
+    });
   });
 
   it("returns a safe editable clone", () => {

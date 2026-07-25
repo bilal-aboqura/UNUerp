@@ -4253,6 +4253,96 @@ footer {
   line-height: 1.8;
 }
 
+.ar-product-video {
+  position: relative;
+  overflow: clip;
+  padding-block: clamp(4.5rem, 8vw, 7.5rem);
+  color: #fff;
+  background:
+    radial-gradient(circle at 8% 50%, rgba(118, 104, 232, 0.22), transparent 32%),
+    var(--night);
+}
+
+.ar-product-video-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(300px, 0.92fr);
+  align-items: center;
+  gap: clamp(2.5rem, 6vw, 6rem);
+}
+
+.ar-product-video-frame {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #120d23;
+}
+
+.ar-product-video-frame video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #120d23;
+  object-fit: cover;
+}
+
+.ar-product-video-live {
+  position: absolute;
+  inset-block-start: 1rem;
+  inset-inline-start: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  background: rgba(7, 17, 31, 0.72);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.ar-product-video-live i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 0 4px rgba(73, 199, 245, 0.18);
+}
+
+.ar-product-video-copy > span {
+  color: var(--cyan);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.ar-product-video-copy h2 {
+  max-width: 13ch;
+  margin: 1rem 0 1.2rem;
+  color: #fff;
+  font-size: clamp(2.15rem, 4.4vw, 4.4rem);
+  line-height: 1.08;
+}
+
+.ar-product-video-copy p {
+  max-width: 48ch;
+  margin: 0;
+  color: #c7d5e5;
+  line-height: 1.85;
+}
+
+.ar-product-video-copy .actions {
+  margin-block-start: 2rem;
+}
+
+.locale-ar .ar-product-video-grid {
+  direction: ltr;
+}
+
+.locale-ar .ar-product-video-copy {
+  direction: rtl;
+  text-align: right;
+}
+
 .ar-detail-hero-grid {
   min-height: 760px;
 }
@@ -4543,7 +4633,8 @@ footer {
   .ar-pricing-factor-grid,
   .ar-industry-value-grid,
   .ar-faq-grid,
-  .ar-quote-grid {
+  .ar-quote-grid,
+  .ar-product-video-grid {
     grid-template-columns: 1fr;
   }
   .ar-marketing-hero-grid,
@@ -4607,4 +4698,7 @@ footer {
   .ar-estimator footer { flex-direction: column; }
   .ar-quote-grid form { padding: 1.2rem; grid-template-columns: 1fr; }
   .ar-quote-grid .wide { grid-column: 1; }
+  .ar-product-video-copy h2 { max-width: 14ch; font-size: clamp(2.25rem, 10vw, 3.4rem); }
+  .ar-product-video-copy .actions { width: 100%; flex-direction: column; }
+  .ar-product-video-copy .button { width: 100%; }
 }

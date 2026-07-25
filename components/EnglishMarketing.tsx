@@ -181,34 +181,59 @@ export function EnglishProductDetail({ page, image, imageAlt }: { page: EnglishP
 
       <section className="section ar-feature-matrix">
         <div className="wrap ar-feature-matrix-grid">
-          <div><span>Operational scope</span><h2>Practical daily capabilities for teams and management</h2><p>Final modules and integrations are defined after reviewing your workflows and current systems.</p></div>
+          <div><span>{page.featuresLabel ?? "Operational scope"}</span><h2>{page.featuresTitle ?? "Practical daily capabilities for teams and management"}</h2><p>{page.featuresIntro ?? "Final modules and integrations are defined after reviewing your workflows and current systems."}</p></div>
           <ul>{page.features.map((feature) => <li key={feature}><i aria-hidden="true">✓</i>{feature}</li>)}</ul>
         </div>
       </section>
 
       <section className="section ar-workflow-section">
         <div className="wrap">
-          <header className="ar-section-head compact"><div><span>How it works</span><h2>One journey you can follow from first action to final outcome</h2></div></header>
+          <header className="ar-section-head compact"><div><span>{page.workflowLabel ?? "How it works"}</span><h2>{page.workflowTitle ?? "One journey you can follow from first action to final outcome"}</h2>{page.workflowIntro ? <p>{page.workflowIntro}</p> : null}</div></header>
           <ol className="ar-workflow">{page.workflow.map((step, index) => <li key={step}><span>{index + 1}</span><strong>{step}</strong></li>)}</ol>
         </div>
       </section>
 
       <section className="section ar-fit-section">
         <div className="wrap ar-fit-grid">
-          <article><span>Built for</span><h2>Teams working in real operating contexts</h2><div className="ar-token-list">{page.audiences.map((item) => <b key={item}>{item}</b>)}</div></article>
-          <article><span>Integrations</span><h2>Designed to work within your business environment</h2><div className="ar-token-list is-dark">{page.integrations.map((item) => <b key={item}>{item}</b>)}</div></article>
+          <article><span>{page.audiencesLabel ?? "Built for"}</span><h2>{page.audiencesTitle ?? "Teams working in real operating contexts"}</h2><div className="ar-token-list">{page.audiences.map((item) => <b key={item}>{item}</b>)}</div></article>
+          <article><span>{page.integrationsLabel ?? "Integrations"}</span><h2>{page.integrationsTitle ?? "Designed to work within your business environment"}</h2><div className="ar-token-list is-dark">{page.integrations.map((item) => <b key={item}>{item}</b>)}</div></article>
         </div>
       </section>
 
       <section className="section ar-faq-section">
         <div className="wrap ar-faq-grid">
-          <div><span>Frequently asked questions</span><h2>Answers before your walkthrough</h2><p>We explain what can be confirmed now. Implementation and integration scope are finalized after reviewing your needs.</p></div>
+          <div><span>{page.faqLabel ?? "Frequently asked questions"}</span><h2>{page.faqTitle ?? "Answers before your walkthrough"}</h2><p>{page.faqIntro ?? "We explain what can be confirmed now. Implementation and integration scope are finalized after reviewing your needs."}</p></div>
           <div className="ar-faq-list">{page.faq.map((item) => <details key={item.question}><summary>{item.question}</summary><p>{item.answer}</p></details>)}</div>
         </div>
       </section>
 
-      <EnglishCta title={page.ctaTitle} text={page.ctaText} />
+      {page.demoVideo?.src ? <EnglishProductVideo page={page} /> : <EnglishCta title={page.ctaTitle} text={page.ctaText} />}
     </>
+  );
+}
+
+function EnglishProductVideo({ page }: { page: EnglishProductPage }) {
+  const video = page.demoVideo;
+  if (!video?.src) return null;
+  const videoType = /\.webm(\?|$)/i.test(video.src) ? "video/webm" : /\.(mov|qt)(\?|$)/i.test(video.src) ? "video/quicktime" : "video/mp4";
+  return (
+    <section className="ar-product-video" aria-labelledby="product-video-title-en">
+      <div className="wrap ar-product-video-grid">
+        <div className="ar-product-video-frame">
+          <video controls playsInline preload="metadata" poster={video.poster || undefined} aria-label={video.title}>
+            <source src={video.src} type={videoType} />
+            Your browser does not support video playback.
+          </video>
+          <span className="ar-product-video-live"><i /> Product walkthrough</span>
+        </div>
+        <div className="ar-product-video-copy">
+          <span>See it in action</span>
+          <h2 id="product-video-title-en">{video.title || page.ctaTitle}</h2>
+          <p>{video.description || page.ctaText}</p>
+          <div className="actions"><Link className="button" href="/contact">Request a demo <Arrow /></Link><a className="button secondary" href="mailto:info@unuerp.com">Contact sales</a></div>
+        </div>
+      </div>
+    </section>
   );
 }
 

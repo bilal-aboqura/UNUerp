@@ -240,7 +240,8 @@
 
 .admin-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; margin-top: 24px; }
 .admin-media-grid article { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px; border: 1px solid var(--admin-line); border-radius: 12px; }
-.admin-media-grid img { grid-column: 1 / -1; width: 100%; aspect-ratio: 16 / 10; border-radius: 8px; background: var(--admin-surface); object-fit: cover; }
+.admin-media-grid :is(img, video) { grid-column: 1 / -1; width: 100%; aspect-ratio: 16 / 10; border-radius: 8px; background: var(--admin-surface); object-fit: cover; }
+.admin-video-preview { max-height: 320px; }
 .admin-media-grid article > div { grid-column: 1 / -1; display: grid; min-width: 0; }
 .admin-media-grid strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .875rem; }
 .admin-media-grid span { color: var(--admin-muted); font-size: .75rem; }

@@ -5,6 +5,25 @@ export type EnglishProductPage = {
   intro: string;
   sectionTitle: string;
   sectionIntro: string;
+  featuresLabel?: string;
+  featuresTitle?: string;
+  featuresIntro?: string;
+  workflowLabel?: string;
+  workflowTitle?: string;
+  workflowIntro?: string;
+  audiencesLabel?: string;
+  audiencesTitle?: string;
+  integrationsLabel?: string;
+  integrationsTitle?: string;
+  faqLabel?: string;
+  faqTitle?: string;
+  faqIntro?: string;
+  demoVideo?: {
+    src: string;
+    poster: string;
+    title: string;
+    description: string;
+  };
   capabilities: { title: string; text: string }[];
   features: string[];
   workflow: string[];

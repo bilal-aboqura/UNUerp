@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { createPublicServerClient } from "@/lib/supabase/server";
 
-const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
-const maxBytes = 10 * 1024 * 1024;
+const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/avif", "video/mp4", "video/webm", "video/quicktime"]);
+const maxBytes = 100 * 1024 * 1024;
 
 function safeName(name: string) {
   const clean = name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
-  return clean || "image";
+  return clean || "media";
 }
 
 export async function GET() {
@@ -25,9 +25,9 @@ export async function POST(request: Request) {
   if (!auth.ok) return NextResponse.json({ message: auth.message }, { status: auth.status });
   const formData = await request.formData();
   const file = formData.get("file");
-  if (!(file instanceof File)) return NextResponse.json({ message: "Choose an image to upload." }, { status: 400 });
-  if (!allowedTypes.has(file.type)) return NextResponse.json({ message: "Upload a JPG, PNG, WebP, or AVIF image." }, { status: 400 });
-  if (file.size > maxBytes) return NextResponse.json({ message: "Images must be 10 MB or smaller." }, { status: 400 });
+  if (!(file instanceof File)) return NextResponse.json({ message: "Choose an image or video to upload." }, { status: 400 });
+  if (!allowedTypes.has(file.type)) return NextResponse.json({ message: "Upload a JPG, PNG, WebP, AVIF, MP4, or WebM file." }, { status: 400 });
+  if (file.size > maxBytes) return NextResponse.json({ message: "Media files must be 100 MB or smaller." }, { status: 400 });
 
   const supabase = await createPublicServerClient();
   if (!supabase) return NextResponse.json({ message: "Supabase is not configured." }, { status: 503 });
