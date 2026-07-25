@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- Administrators can provide Supabase-hosted image URLs outside Next's static allowlist. */
 
-import { ChangeEvent, ReactNode, useEffect, useEffectEvent, useMemo, useState } from "react";
+import { ChangeEvent, DragEvent, ReactNode, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
@@ -51,7 +51,33 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-type MediaUploadTicket = { token: string; storagePath: string; publicUrl: string };
+type MediaUploadTicket = { token: string; signedUrl: string; storagePath: string; publicUrl: string };
+type MediaUploadOptions = { onProgress?: (percent: number) => void; signal?: AbortSignal; headers?: Record<string, string> };
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+}
+
+function uploadSignedFile(url: string, file: File, options: MediaUploadOptions = {}) {
+  return new Promise<void>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("PUT", url);
+    Object.entries(options.headers ?? {}).forEach(([name, value]) => request.setRequestHeader(name, value));
+    request.setRequestHeader("Content-Type", file.type);
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) options.onProgress?.(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+    };
+    request.onload = () => {
+      if (request.status >= 200 && request.status < 300) resolve();
+      else reject(new Error(`Storage upload failed (${request.status}).`));
+    };
+    request.onerror = () => reject(new Error("The connection was interrupted. Check your connection and try again."));
+    request.onabort = () => reject(Object.assign(new Error("Upload cancelled."), { name: "AbortError" }));
+    options.signal?.addEventListener("abort", () => request.abort(), { once: true });
+    request.send(file);
+  });
+}
 
 async function readApiResponse<T>(response: Response): Promise<T & { message?: string }> {
   const text = await response.text();
@@ -143,12 +169,14 @@ function ContentEditor({
   onUpload,
   depth = 0,
   mediaKind,
+  excludeKeys,
 }: {
   value: JsonValue;
   onChange: (value: JsonValue) => void;
   onUpload: (file: File) => Promise<string | null>;
   depth?: number;
   mediaKind?: "image" | "video";
+  excludeKeys?: string[];
 }) {
   if (Array.isArray(value)) {
     const primitive = value.every((item) => ["string", "number", "boolean"].includes(typeof item));
@@ -176,7 +204,7 @@ function ContentEditor({
   if (!value || typeof value !== "object") return null;
   return (
     <div className={`admin-object admin-object-depth-${Math.min(depth, 2)}`}>
-      {Object.entries(value).map(([key, item]) => {
+      {Object.entries(value).filter(([key]) => key !== "demoVideo" && !excludeKeys?.includes(key)).map(([key, item]) => {
         const nested = item !== null && typeof item === "object";
         const childMediaKind = /poster|image|logo/i.test(key) ? "image" : (mediaKind === "video" && key === "src") || /video/i.test(key) ? "video" : undefined;
         return nested ? (
@@ -244,7 +272,7 @@ export function AdminDashboard({
     setStatus({ tone: "dirty", message: "Unsaved changes" });
   }
 
-  async function uploadMedia(file: File) {
+  async function uploadMedia(file: File, options: MediaUploadOptions = {}) {
     const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/avif", "video/mp4", "video/webm", "video/quicktime"]);
     if (!allowedTypes.has(file.type)) {
       setStatus({ tone: "error", message: "Upload a JPG, PNG, WebP, AVIF, MP4, or WebM file." });
@@ -260,30 +288,34 @@ export function AdminDashboard({
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name: file.name, type: file.type, size: file.size }),
+      signal: options.signal,
     });
     const ticket = await readApiResponse<MediaUploadTicket>(ticketResponse);
-    if (!ticketResponse.ok || !ticket.token || !ticket.storagePath) {
+    if (!ticketResponse.ok || !ticket.token || !ticket.signedUrl || !ticket.storagePath) {
       setStatus({ tone: "error", message: ticket.message ?? "Could not prepare the upload." });
       return null;
     }
 
-    const supabase = createSupabaseBrowserClient();
-    if (!supabase) {
-      setStatus({ tone: "error", message: "Supabase is not configured." });
-      return null;
-    }
     setStatus({ tone: "saving", message: `Uploading ${file.name} directly to storage…` });
-    const { error: uploadError } = await supabase.storage.from("site-media").uploadToSignedUrl(ticket.storagePath, ticket.token, file, { contentType: file.type });
-    if (uploadError) {
-      setStatus({ tone: "error", message: uploadError.message || "Media upload failed." });
+    options.onProgress?.(0);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const session = supabase ? (await supabase.auth.getSession()).data.session : null;
+      const authToken = session?.access_token ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      await uploadSignedFile(ticket.signedUrl, file, { ...options, headers: authToken ? { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? authToken, Authorization: `Bearer ${authToken}` } : undefined });
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") setStatus({ tone: "neutral", message: "Upload cancelled." });
+      else setStatus({ tone: "error", message: error instanceof Error ? error.message : "Media upload failed." });
       return null;
     }
 
     setStatus({ tone: "saving", message: "Finalizing media record…" });
+    options.onProgress?.(100);
     const completeResponse = await fetch("/api/admin/media/complete", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name: file.name, storagePath: ticket.storagePath, mimeType: file.type, sizeBytes: file.size }),
+      signal: options.signal,
     });
     const result = await readApiResponse<MediaAsset>(completeResponse);
     if (!completeResponse.ok || !result.id) {
@@ -393,8 +425,68 @@ function Overview({ content, media, enquiries, onNavigate }: { content: SiteCont
   return <><PanelHeader title="Website overview" body="Everything shown here is connected to the live public website." /><div className="admin-overview-grid"><article><span>Content</span><h3>Keep the website current</h3><p>Edit bilingual homepage, product, feature, industry, pricing, and company details.</p><button type="button" onClick={() => onNavigate("homepage")}>Edit homepage</button></article><article><span>Media</span><h3>{media.length} uploaded assets</h3><p>Upload product screenshots, page imagery, logos, and replacement visuals.</p><button type="button" onClick={() => onNavigate("media")}>Open media library</button></article><article><span>Enquiries</span><h3>{newLeads} new requests</h3><p>Review demo requests and track each conversation through qualification.</p><button type="button" onClick={() => onNavigate("enquiries")}>Review enquiries</button></article></div><section className="admin-editor-section"><h3>Publishing status</h3><dl className="admin-health"><div><dt>Content schema</dt><dd>Version {content.version}</dd></div><div><dt>Languages</dt><dd>English and Arabic</dd></div><div><dt>Publishing</dt><dd>Immediate on save</dd></div><div><dt>Storage</dt><dd>Supabase protected</dd></div></dl></section></>;
 }
 
-function MediaLibrary({ media, onUpload, onDelete }: { media: MediaAsset[]; onUpload: (file: File) => Promise<string | null>; onDelete: (id: string) => void }) {
+function EnhancedMediaLibrary({ media, onUpload, onDelete }: { media: MediaAsset[]; onUpload: (file: File, options?: MediaUploadOptions) => Promise<string | null>; onDelete: (id: string) => void }) {
+  const [message, setMessage] = useState("Drop an image or video here, or choose a file.");
+  const [uploadState, setUploadState] = useState<{ file: File; percent: number; phase: "preparing" | "uploading" | "saving" | "error" } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  async function upload(file: File) {
+    if (uploadState && uploadState.phase !== "error") return;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setUploadState({ file, percent: 0, phase: "preparing" });
+    setMessage(`Preparing ${file.name}…`);
+    const url = await onUpload(file, { signal: controller.signal, onProgress: (percent) => setUploadState((current) => current ? { ...current, percent, phase: percent >= 100 ? "saving" : "uploading" } : current) });
+    abortRef.current = null;
+    if (url) {
+      setUploadState(null);
+      setMessage(`${file.name} is ready to use.`);
+    } else if (!controller.signal.aborted) {
+      setUploadState({ file, percent: 0, phase: "error" });
+      setMessage("Upload failed. Check the status above and try again.");
+    }
+  }
+
+  function choose(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (file) void upload(file);
+    event.target.value = "";
+  }
+
+  function drop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDragging(false);
+    const file = event.dataTransfer.files?.[0];
+    if (file) void upload(file);
+  }
+
+  function cancel() {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setUploadState(null);
+    setMessage("Upload cancelled. You can choose another file.");
+  }
+
+  async function remove(id: string) { if (!window.confirm("Delete this media asset? Existing page references may stop working.")) return; const response = await fetch(`/api/admin/media?id=${encodeURIComponent(id)}`, { method: "DELETE" }); if (response.ok) onDelete(id); }
+
+  return <>
+    <PanelHeader title="Media library" body={message} action={<button className="admin-primary" type="button" onClick={() => inputRef.current?.click()} disabled={Boolean(uploadState)}>Choose media</button>} />
+    <input ref={inputRef} className="admin-visually-hidden" type="file" accept="image/*,video/mp4,video/webm,video/quicktime" onChange={choose} />
+    <div className={`admin-dropzone${dragging ? " is-dragging" : ""}`} onDragEnter={() => setDragging(true)} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={drop}>
+      <strong>Drag and drop your image or video</strong>
+      <span>MP4, WebM, JPG, PNG, WebP, or AVIF · maximum 100 MB</span>
+      <button className="admin-secondary" type="button" onClick={() => inputRef.current?.click()} disabled={Boolean(uploadState)}>Browse files</button>
+    </div>
+    {uploadState ? <div className={`admin-upload-progress is-${uploadState.phase}`} role="status"><div><strong>{uploadState.file.name}</strong><span>{uploadState.phase === "preparing" ? "Preparing secure upload…" : uploadState.phase === "saving" ? "Saving media details…" : uploadState.phase === "error" ? "Upload failed" : `${uploadState.percent}% uploaded`}</span></div><div className="admin-progress-track"><i style={{ width: `${uploadState.percent}%` }} /></div>{uploadState.phase !== "error" ? <button className="admin-secondary" type="button" onClick={cancel}>Cancel upload</button> : <button className="admin-secondary" type="button" onClick={() => void upload(uploadState.file)}>Try again</button>}</div> : null}
+    {media.length ? <div className="admin-media-grid">{media.map((asset) => <article key={asset.id}>{asset.mime_type.startsWith("video/") ? <video src={asset.public_url} controls preload="metadata" /> : <img src={asset.public_url} alt={asset.alt_en || asset.name} loading="lazy" />}<div><strong>{asset.name}</strong><span>{formatBytes(asset.size_bytes)} · {asset.mime_type.startsWith("video/") ? "Video" : "Image"}</span></div><button type="button" onClick={() => void navigator.clipboard.writeText(asset.public_url)}>Copy URL</button><button className="admin-danger-link" type="button" onClick={() => void remove(asset.id)}>Delete</button></article>)}</div> : <p className="admin-empty">No uploaded assets yet. Existing images in the project remain available.</p>}
+  </>;
+}
+
+function MediaLibrary({ media, onUpload, onDelete }: { media: MediaAsset[]; onUpload: (file: File, options?: MediaUploadOptions) => Promise<string | null>; onDelete: (id: string) => void }) {
   const [message, setMessage] = useState("Upload images or MP4/WebM videos up to 100 MB.");
+  return <EnhancedMediaLibrary media={media} onUpload={onUpload} onDelete={onDelete} />;
   async function upload(event: ChangeEvent<HTMLInputElement>) { const file = event.target.files?.[0]; if (!file) return; setMessage(`Uploading ${file.name}…`); const url = await onUpload(file); setMessage(url ? `${file.name} is ready to use.` : "Upload failed. Try again."); event.target.value = ""; }
   async function remove(id: string) { if (!window.confirm("Delete this media asset? Existing page references may stop working.")) return; const response = await fetch(`/api/admin/media?id=${encodeURIComponent(id)}`, { method: "DELETE" }); if (response.ok) onDelete(id); }
   return <><PanelHeader title="Media library" body={message} action={<label className="admin-primary admin-file-action">Upload media<input type="file" accept="image/*,video/mp4,video/webm,video/quicktime" onChange={upload} /></label>} />{media.length ? <div className="admin-media-grid">{media.map((asset) => <article key={asset.id}>{asset.mime_type.startsWith("video/") ? <video src={asset.public_url} controls preload="metadata" /> : <img src={asset.public_url} alt={asset.alt_en || asset.name} loading="lazy" />}<div><strong>{asset.name}</strong><span>{Math.max(1, Math.round(asset.size_bytes / 1024))} KB · {asset.mime_type.startsWith("video/") ? "Video" : "Image"}</span></div><button type="button" onClick={() => void navigator.clipboard.writeText(asset.public_url)}>Copy URL</button><button className="admin-danger-link" type="button" onClick={() => void remove(asset.id)}>Delete</button></article>)}</div> : <p className="admin-empty">No uploaded assets yet. Existing images in the project remain available.</p>}</>;

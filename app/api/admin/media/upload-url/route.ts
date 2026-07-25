@@ -37,5 +37,5 @@ export async function POST(request: Request) {
   if (error || !data?.token) return NextResponse.json({ message: error?.message ?? "Could not prepare the upload." }, { status: 500 });
 
   const { data: publicData } = supabase.storage.from("site-media").getPublicUrl(storagePath);
-  return NextResponse.json({ token: data.token, storagePath, publicUrl: publicData.publicUrl });
+  return NextResponse.json({ token: data.token, signedUrl: data.signedUrl, storagePath, publicUrl: publicData.publicUrl });
 }
