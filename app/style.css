@@ -4524,7 +4524,9 @@ footer {
 .ar-industry-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); border-block-start: 1px solid var(--line); border-inline-start: 1px solid var(--line); }
 .ar-industry-grid > a { min-height: 305px; padding: 1.6rem; display: grid; grid-template-columns: 1fr auto; align-content: start; gap: 0.8rem; border-block-end: 1px solid var(--line); border-inline-end: 1px solid var(--line); background: #fff; transition: background .25s var(--ease-out), transform .25s var(--ease-out); }
 .ar-industry-grid > a:hover { background: var(--surface-blue); transform: translateY(-3px); }
-.ar-industry-mark { width: 42px; height: 42px; display: grid; place-items: center; border-radius: var(--radius-sm); background: var(--blue); color: var(--cyan); font-size: 1rem; }
+.ar-industry-mark { position: relative; width: 50px; height: 50px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-blue); box-shadow: none; color: var(--blue); font-size: 1rem; transition: border-color .25s var(--ease-out), background .25s var(--ease-out), transform .25s var(--ease-out); }
+.ar-industry-mark .industry-emoji { position: relative; z-index: 1; display: block; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; font-size: 1.75rem; line-height: 1; }
+.ar-industry-grid > a:hover .ar-industry-mark { border-color: var(--cyan); background: var(--surface-blue); transform: translateY(-2px); }
 .ar-industry-grid small { justify-self: end; color: var(--cyan-deep); font-family: var(--font-display), sans-serif; font-weight: 850; }
 .ar-industry-grid h3 { grid-column: 1 / -1; margin: 1rem 0 0; color: var(--blue); font-size: 1.4rem; }
 .ar-industry-grid p { grid-column: 1 / -1; margin: 0; color: var(--muted); line-height: 1.75; }
@@ -4701,4 +4703,139 @@ footer {
   .ar-product-video-copy h2 { max-width: 14ch; font-size: clamp(2.25rem, 10vw, 3.4rem); }
   .ar-product-video-copy .actions { width: 100%; flex-direction: column; }
   .ar-product-video-copy .button { width: 100%; }
+}
+
+/* Product workflow marquee inspired by the supplied two-row card reference. */
+.ar-workflow-section {
+  overflow: hidden;
+  color: #fff;
+  background: var(--night);
+}
+
+.ar-workflow-section .ar-section-head {
+  position: relative;
+  z-index: 1;
+  margin-block-end: clamp(2.25rem, 5vw, 4rem);
+}
+
+.ar-workflow-section .ar-section-head span { color: var(--cyan); }
+.ar-workflow-section .ar-section-head h2 { color: #fff; }
+.ar-workflow-section .ar-section-head p { color: #bdcadb; line-height: 1.8; }
+
+.ar-workflow-marquee {
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+  display: grid;
+  gap: 1rem;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+}
+
+.ar-workflow-marquee-row {
+  width: max-content;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 1.25rem;
+  list-style: none;
+  direction: ltr;
+  animation: ar-workflow-marquee-forward 36s linear infinite;
+  will-change: transform;
+}
+
+.ar-workflow-marquee-row.is-reverse {
+  animation-name: ar-workflow-marquee-reverse;
+  animation-duration: 42s;
+}
+
+.ar-workflow-marquee:hover .ar-workflow-marquee-row { animation-play-state: paused; }
+
+.ar-workflow-marquee-row li,
+.ar-workflow-marquee-row li:last-child {
+  position: relative;
+  flex: 0 0 clamp(250px, 20vw, 370px);
+  min-height: 174px;
+  padding: 1.35rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2rem;
+  border: 1px solid rgba(203, 213, 226, 0.2);
+  border-radius: var(--radius-md);
+  background: var(--night-raised);
+}
+
+.ar-workflow-marquee-row li::after { display: none; }
+
+.ar-workflow-marquee-row li > span {
+  color: var(--cyan);
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+}
+
+.ar-workflow-marquee-row li > strong {
+  max-width: 14ch;
+  color: #fff;
+  font-size: clamp(1.05rem, 1.6vw, 1.3rem);
+  line-height: 1.35;
+}
+
+.locale-ar .ar-workflow-marquee-row li {
+  direction: rtl;
+  text-align: right;
+}
+
+.locale-ar .ar-workflow-marquee-row {
+  direction: rtl;
+  animation-name: ar-workflow-marquee-ar-forward;
+}
+
+.locale-ar .ar-workflow-marquee-row.is-reverse {
+  animation-name: ar-workflow-marquee-ar-reverse;
+}
+
+@keyframes ar-workflow-marquee-forward {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes ar-workflow-marquee-reverse {
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes ar-workflow-marquee-ar-forward {
+  from { transform: translateX(0); }
+  to { transform: translateX(50%); }
+}
+
+@keyframes ar-workflow-marquee-ar-reverse {
+  from { transform: translateX(50%); }
+  to { transform: translateX(0); }
+}
+
+@media (max-width: 640px) {
+  .ar-workflow-marquee { gap: 0.75rem; }
+  .ar-workflow-marquee-row { gap: 0.75rem; }
+  .ar-workflow-marquee-row li,
+  .ar-workflow-marquee-row li:last-child {
+    flex-basis: min(78vw, 285px);
+    min-height: 150px;
+    padding: 1.15rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ar-workflow-marquee-row,
+  .ar-workflow-marquee-row.is-reverse {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    animation: none;
+  }
+
+  .ar-workflow-marquee-row li[aria-hidden="true"] { display: none; }
 }

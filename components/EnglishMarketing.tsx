@@ -6,6 +6,7 @@ import {
   englishProductCatalog,
   type EnglishProductPage,
 } from "@/lib/en-marketing-content";
+import { WorkflowMarquee } from "@/components/WorkflowMarquee";
 
 const Arrow = () => <span aria-hidden="true">↗</span>;
 
@@ -193,7 +194,7 @@ export function EnglishProductDetail({ page, image, imageAlt }: { page: EnglishP
       <section className="section ar-workflow-section">
         <div className="wrap">
           <header className="ar-section-head compact"><div><span>{page.workflowLabel ?? "How it works"}</span><h2>{page.workflowTitle ?? "One journey you can follow from first action to final outcome"}</h2>{page.workflowIntro ? <p>{page.workflowIntro}</p> : null}</div></header>
-          <ol className="ar-workflow">{page.workflow.map((step, index) => <li key={step}><span>{index + 1}</span><strong>{step}</strong></li>)}</ol>
+          <WorkflowMarquee steps={page.workflow} ariaLabel="Workflow steps" />
         </div>
       </section>
 
@@ -226,11 +227,10 @@ function EnglishProductVideo({ page }: { page: EnglishProductPage }) {
     <section className="ar-product-video" aria-labelledby="product-video-title-en">
       <div className="wrap ar-product-video-grid">
         <div className="ar-product-video-frame">
-          <video controls playsInline preload="metadata" poster={poster || undefined} aria-label={video.title}>
+          <video autoPlay loop muted playsInline preload="auto" poster={poster || undefined} aria-label={video.title}>
             <source src={videoSrc} type={videoType} />
             Your browser does not support video playback.
           </video>
-          <span className="ar-product-video-live"><i /> Product walkthrough</span>
         </div>
         <div className="ar-product-video-copy">
           <span>See it in action</span>

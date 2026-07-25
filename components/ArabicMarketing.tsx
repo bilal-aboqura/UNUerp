@@ -6,6 +6,7 @@ import {
   arabicProductCatalog,
   type ArabicProductPage,
 } from "@/lib/ar-marketing-content";
+import { WorkflowMarquee } from "@/components/WorkflowMarquee";
 
 const Arrow = () => <span aria-hidden="true">↗</span>;
 
@@ -236,9 +237,7 @@ export function ArabicProductDetail({ page, image, imageAlt }: { page: ArabicPro
           <header className="ar-section-head compact">
             <div><span>{page.workflowLabel ?? "كيف يعمل؟"}</span><h2>{page.workflowTitle ?? "رحلة واحدة يمكن متابعتها من البداية إلى النتيجة"}</h2>{page.workflowIntro ? <p>{page.workflowIntro}</p> : null}</div>
           </header>
-          <ol className="ar-workflow">
-            {page.workflow.map((step, index) => <li key={step}><span>{index + 1}</span><strong>{step}</strong></li>)}
-          </ol>
+          <WorkflowMarquee steps={page.workflow} ariaLabel="خطوات سير العمل" />
         </div>
       </section>
 
@@ -281,11 +280,10 @@ function ArabicProductVideo({ page }: { page: ArabicProductPage }) {
     <section className="ar-product-video" aria-labelledby="product-video-title">
       <div className="wrap ar-product-video-grid">
         <div className="ar-product-video-frame">
-          <video controls playsInline preload="metadata" poster={poster || undefined} aria-label={video.title}>
+          <video autoPlay loop muted playsInline preload="auto" poster={poster || undefined} aria-label={video.title}>
             <source src={videoSrc} type={videoType} />
             متصفحك لا يدعم تشغيل الفيديو.
           </video>
-          <span className="ar-product-video-live"><i /> عرض توضيحي</span>
         </div>
         <div className="ar-product-video-copy">
           <span>شاهدها أثناء العمل</span>
