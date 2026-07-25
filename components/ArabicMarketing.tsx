@@ -9,6 +9,10 @@ import {
 
 const Arrow = () => <span aria-hidden="true">↗</span>;
 
+function normalizeMediaUrl(src: string) {
+  return src && !/^(https?:|data:|\/)/i.test(src) ? `/${src}` : src;
+}
+
 export function ArabicProductDashboard({
   content,
   compact = false,
@@ -270,13 +274,15 @@ export function ArabicProductDetail({ page, image, imageAlt }: { page: ArabicPro
 function ArabicProductVideo({ page }: { page: ArabicProductPage }) {
   const video = page.demoVideo;
   if (!video?.src) return null;
-  const videoType = /\.webm(\?|$)/i.test(video.src) ? "video/webm" : /\.(mov|qt)(\?|$)/i.test(video.src) ? "video/quicktime" : "video/mp4";
+  const videoSrc = normalizeMediaUrl(video.src);
+  const poster = normalizeMediaUrl(video.poster);
+  const videoType = /\.webm(\?|$)/i.test(videoSrc) ? "video/webm" : /\.(mov|qt)(\?|$)/i.test(videoSrc) ? "video/quicktime" : "video/mp4";
   return (
     <section className="ar-product-video" aria-labelledby="product-video-title">
       <div className="wrap ar-product-video-grid">
         <div className="ar-product-video-frame">
-          <video controls playsInline preload="metadata" poster={video.poster || undefined} aria-label={video.title}>
-            <source src={video.src} type={videoType} />
+          <video controls playsInline preload="metadata" poster={poster || undefined} aria-label={video.title}>
+            <source src={videoSrc} type={videoType} />
             متصفحك لا يدعم تشغيل الفيديو.
           </video>
           <span className="ar-product-video-live"><i /> عرض توضيحي</span>

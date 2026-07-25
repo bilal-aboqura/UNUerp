@@ -9,4 +9,3 @@ test-results/
 .impeccable/
 .env*
 !.env.example
-public/assets/unu-exchange.mp4

@@ -51,6 +51,17 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+type MediaUploadTicket = { token: string; storagePath: string; publicUrl: string };
+
+async function readApiResponse<T>(response: Response): Promise<T & { message?: string }> {
+  const text = await response.text();
+  try {
+    return JSON.parse(text) as T & { message?: string };
+  } catch {
+    return { message: text || `Request failed (${response.status}).` } as T & { message?: string };
+  }
+}
+
 function titleFromKey(key: string) {
   return key
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
@@ -234,13 +245,49 @@ export function AdminDashboard({
   }
 
   async function uploadMedia(file: File) {
-    setStatus({ tone: "saving", message: `Uploading ${file.name}…` });
-    const form = new FormData();
-    form.append("file", file);
-    const response = await fetch("/api/admin/media", { method: "POST", body: form });
-    const result = await response.json() as MediaAsset & { message?: string };
-    if (!response.ok) {
-      setStatus({ tone: "error", message: result.message ?? "Media upload failed." });
+    const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/avif", "video/mp4", "video/webm", "video/quicktime"]);
+    if (!allowedTypes.has(file.type)) {
+      setStatus({ tone: "error", message: "Upload a JPG, PNG, WebP, AVIF, MP4, or WebM file." });
+      return null;
+    }
+    if (file.size > 100 * 1024 * 1024) {
+      setStatus({ tone: "error", message: "Media files must be 100 MB or smaller." });
+      return null;
+    }
+
+    setStatus({ tone: "saving", message: `Preparing ${file.name}…` });
+    const ticketResponse = await fetch("/api/admin/media/upload-url", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: file.name, type: file.type, size: file.size }),
+    });
+    const ticket = await readApiResponse<MediaUploadTicket>(ticketResponse);
+    if (!ticketResponse.ok || !ticket.token || !ticket.storagePath) {
+      setStatus({ tone: "error", message: ticket.message ?? "Could not prepare the upload." });
+      return null;
+    }
+
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase) {
+      setStatus({ tone: "error", message: "Supabase is not configured." });
+      return null;
+    }
+    setStatus({ tone: "saving", message: `Uploading ${file.name} directly to storage…` });
+    const { error: uploadError } = await supabase.storage.from("site-media").uploadToSignedUrl(ticket.storagePath, ticket.token, file, { contentType: file.type });
+    if (uploadError) {
+      setStatus({ tone: "error", message: uploadError.message || "Media upload failed." });
+      return null;
+    }
+
+    setStatus({ tone: "saving", message: "Finalizing media record…" });
+    const completeResponse = await fetch("/api/admin/media/complete", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: file.name, storagePath: ticket.storagePath, mimeType: file.type, sizeBytes: file.size }),
+    });
+    const result = await readApiResponse<MediaAsset>(completeResponse);
+    if (!completeResponse.ok || !result.id) {
+      setStatus({ tone: "error", message: result.message ?? "Media was uploaded but could not be saved." });
       return null;
     }
     setMedia((current) => [result, ...current]);
