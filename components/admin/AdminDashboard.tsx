@@ -1,9 +1,15 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- Administrators can provide Supabase-hosted image URLs outside Next's static allowlist. */
 
-import { ChangeEvent, DragEvent, ReactNode, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, ReactNode, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  createIndustryResource,
+  createProductResource,
+  slugifyResource,
+  type NewResourceInput,
+} from "@/lib/admin-content-resources";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { JsonValue, SiteContent } from "@/lib/site-content";
 
@@ -35,6 +41,7 @@ export type Enquiry = {
 
 type TabKey = "overview" | "homepage" | "products" | "features" | "industries" | "media" | "enquiries" | "settings";
 type Locale = "en" | "ar";
+type AddableResource = "product" | "industry";
 
 const tabs: { key: TabKey; label: string }[] = [
   { key: "overview", label: "Overview" },
@@ -170,6 +177,7 @@ function ContentEditor({
   depth = 0,
   mediaKind,
   excludeKeys,
+  showWorkflow = true,
 }: {
   value: JsonValue;
   onChange: (value: JsonValue) => void;
@@ -177,6 +185,7 @@ function ContentEditor({
   depth?: number;
   mediaKind?: "image" | "video";
   excludeKeys?: string[];
+  showWorkflow?: boolean;
 }) {
   if (Array.isArray(value)) {
     const primitive = value.every((item) => ["string", "number", "boolean"].includes(typeof item));
@@ -202,9 +211,14 @@ function ContentEditor({
   }
 
   if (!value || typeof value !== "object") return null;
+  const workflowKeys = ["workflowLabel", "workflowTitle", "workflowIntro"] as const;
+  const hasWorkflow = showWorkflow && workflowKeys.every((key) => key in value);
+  const workflowValue = Object.fromEntries(workflowKeys.map((key) => [key, value[key] ?? ""])) as unknown as JsonValue;
+  const isWorkflowKey = (key: string): key is (typeof workflowKeys)[number] => workflowKeys.includes(key as (typeof workflowKeys)[number]);
   return (
     <div className={`admin-object admin-object-depth-${Math.min(depth, 2)}`}>
-      {Object.entries(value).filter(([key]) => key !== "demoVideo" && !excludeKeys?.includes(key)).map(([key, item]) => {
+      {hasWorkflow ? <section className="admin-editor-section admin-workflow-editor"><h3>Workflow section</h3><p className="admin-editor-help">Edit the eyebrow, title, and description shown above the product workflow.</p><ContentEditor value={workflowValue} showWorkflow={false} onUpload={onUpload} onChange={(next) => { const copy = clone(value); const fields = next as Record<string, JsonValue>; workflowKeys.forEach((key) => { copy[key] = fields[key] ?? ""; }); onChange(copy); }} /></section> : null}
+      {Object.entries(value).filter(([key]) => key !== "demoVideo" && !excludeKeys?.includes(key) && (!hasWorkflow || !isWorkflowKey(key))).map(([key, item]) => {
         const nested = item !== null && typeof item === "object";
         const childMediaKind = /poster|image|logo/i.test(key) ? "image" : (mediaKind === "video" && key === "src") || /video/i.test(key) ? "video" : undefined;
         return nested ? (
@@ -245,6 +259,7 @@ export function AdminDashboard({
   const [selectedProduct, setSelectedProduct] = useState(Object.keys(initialContent.products)[0] ?? "");
   const [selectedFeature, setSelectedFeature] = useState(Object.keys(initialContent.features)[0] ?? "");
   const [selectedIndustry, setSelectedIndustry] = useState(Object.keys(initialContent.industries)[0] ?? "");
+  const [addingResource, setAddingResource] = useState<AddableResource | null>(null);
   const [status, setStatus] = useState<{ tone: string; message: string }>({ tone: "success", message: "Changes are live" });
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -270,6 +285,28 @@ export function AdminDashboard({
     setContent(next);
     setDirty(true);
     setStatus({ tone: "dirty", message: "Unsaved changes" });
+  }
+
+  function addResource(kind: AddableResource, input: NewResourceInput) {
+    const slug = slugifyResource(input.slug);
+    const next = clone(content);
+    const collection = kind === "product" ? next.products : next.industries;
+    if (!slug || slug in collection) return false;
+
+    if (kind === "product") {
+      next.products[slug] = createProductResource({ ...input, slug });
+      setSelectedProduct(slug);
+    } else {
+      next.industries[slug] = createIndustryResource({ ...input, slug });
+      setSelectedIndustry(slug);
+    }
+
+    setContent(next);
+    setLocale("en");
+    setAddingResource(null);
+    setDirty(true);
+    setStatus({ tone: "dirty", message: `New ${kind} added. Review and save to publish.` });
+    return true;
   }
 
   async function uploadMedia(file: File, options: MediaUploadOptions = {}) {
@@ -344,7 +381,11 @@ export function AdminDashboard({
   }
 
   function reset() {
-    setContent(clone(baseline));
+    const liveContent = clone(baseline);
+    setContent(liveContent);
+    if (!liveContent.products[selectedProduct]) setSelectedProduct(Object.keys(liveContent.products)[0] ?? "");
+    if (!liveContent.industries[selectedIndustry]) setSelectedIndustry(Object.keys(liveContent.industries)[0] ?? "");
+    setAddingResource(null);
     setDirty(false);
     setStatus({ tone: "neutral", message: "Reverted to the live version" });
   }
@@ -380,13 +421,13 @@ export function AdminDashboard({
   } else if (tab === "products") {
     const current = content.products[selectedProduct];
     const productPage = current?.[locale] as unknown as { demoVideo?: JsonValue } | undefined;
-    editor = <><PanelHeader title="Products" body="Manage product cards, full product pages, editable section copy, FAQs, workflows, and product media." action={<ResourceSelect value={selectedProduct} options={Object.keys(content.products)} onChange={setSelectedProduct} />} /><LocaleTabs locale={locale} onChange={setLocale} />{current ? <><section className="admin-editor-section"><h3>Catalog card</h3><ContentEditor value={current.catalog[locale]} onUpload={uploadMedia} onChange={(value) => update(["products", selectedProduct, "catalog", locale], value)} /></section><section className="admin-editor-section"><h3>Product page</h3><ContentEditor value={current[locale]} onUpload={uploadMedia} onChange={(value) => update(["products", selectedProduct, locale], value)} /></section><section className="admin-editor-section"><h3>Product demo video</h3><p className="admin-editor-help">Upload a replacement video here. The video is shown in the product detail page; leave the URL empty to keep the standard call-to-action.</p><ContentEditor value={productPage?.demoVideo ?? { src: "", poster: "", title: "", description: "" }} mediaKind="video" onUpload={uploadMedia} onChange={(value) => update(["products", selectedProduct, locale, "demoVideo"], value)} /></section><section className="admin-editor-section"><h3>Dashboard replacement image</h3><p className="admin-editor-help">Upload a real product screenshot here to replace the illustrated dashboard in the product hero. Keep the image blank to use the illustration.</p><ContentEditor value={{ image: current.image, imageAlt: current.imageAlt[locale] }} onUpload={uploadMedia} onChange={(value) => { const item = value as { image: string; imageAlt: string }; updateMany([{ path: ["products", selectedProduct, "image"], value: item.image }, { path: ["products", selectedProduct, "imageAlt", locale], value: item.imageAlt }]); }} /></section></> : null}</>;
+    editor = <><PanelHeader title="Products" body="Manage product cards, full product pages, editable section copy, FAQs, workflows, and product media." action={<ResourceActions kind="product" value={selectedProduct} options={Object.keys(content.products)} onChange={setSelectedProduct} onAdd={() => setAddingResource(addingResource === "product" ? null : "product")} />} />{addingResource === "product" ? <NewResourceForm kind="product" existingSlugs={Object.keys(content.products)} onCancel={() => setAddingResource(null)} onCreate={(input) => addResource("product", input)} /> : null}<LocaleTabs locale={locale} onChange={setLocale} />{current ? <><section className="admin-editor-section"><h3>Catalog card</h3><ContentEditor value={current.catalog[locale]} onUpload={uploadMedia} onChange={(value) => update(["products", selectedProduct, "catalog", locale], value)} /></section><section className="admin-editor-section"><h3>Product page</h3><ContentEditor value={current[locale]} onUpload={uploadMedia} onChange={(value) => update(["products", selectedProduct, locale], value)} /></section><section className="admin-editor-section"><h3>Product demo video</h3><p className="admin-editor-help">Upload a replacement video here. The video is shown in the product detail page; leave the URL empty to keep the standard call-to-action.</p><ContentEditor value={productPage?.demoVideo ?? { src: "", poster: "", title: "", description: "" }} mediaKind="video" onUpload={uploadMedia} onChange={(value) => update(["products", selectedProduct, locale, "demoVideo"], value)} /></section><section className="admin-editor-section"><h3>Dashboard replacement image</h3><p className="admin-editor-help">Upload a real product screenshot here to replace the illustrated dashboard in the product hero. Keep the image blank to use the illustration.</p><ContentEditor value={{ image: current.image, imageAlt: current.imageAlt[locale] }} onUpload={uploadMedia} onChange={(value) => { const item = value as { image: string; imageAlt: string }; updateMany([{ path: ["products", selectedProduct, "image"], value: item.image }, { path: ["products", selectedProduct, "imageAlt", locale], value: item.imageAlt }]); }} /></section></> : null}</>;
   } else if (tab === "features") {
     const current = content.features[selectedFeature];
     editor = <><PanelHeader title="Features" body="Edit every ERP capability, benefit, headline, and localized description." action={<ResourceSelect value={selectedFeature} options={Object.keys(content.features)} onChange={setSelectedFeature} />} /><LocaleTabs locale={locale} onChange={setLocale} />{current ? <ContentEditor value={current[locale] as unknown as JsonValue} onUpload={uploadMedia} onChange={(value) => update(["features", selectedFeature, locale], value)} /> : null}</>;
   } else if (tab === "industries") {
     const current = content.industries[selectedIndustry];
-    editor = <><PanelHeader title="Industries" body="Manage industry names, summaries, detailed page copy, and imagery." action={<ResourceSelect value={selectedIndustry} options={Object.keys(content.industries)} onChange={setSelectedIndustry} />} /><LocaleTabs locale={locale} onChange={setLocale} />{current ? <><ContentEditor value={current[locale] as unknown as JsonValue} onUpload={uploadMedia} onChange={(value) => update(["industries", selectedIndustry, locale], value)} /><section className="admin-editor-section"><h3>Industry media</h3><ContentEditor value={{ image: current.image }} onUpload={uploadMedia} onChange={(value) => update(["industries", selectedIndustry, "image"], (value as { image: string }).image)} /></section></> : null}</>;
+    editor = <><PanelHeader title="Industries" body="Manage industry names, summaries, detailed page copy, and imagery." action={<ResourceActions kind="industry" value={selectedIndustry} options={Object.keys(content.industries)} onChange={setSelectedIndustry} onAdd={() => setAddingResource(addingResource === "industry" ? null : "industry")} />} />{addingResource === "industry" ? <NewResourceForm kind="industry" existingSlugs={Object.keys(content.industries)} onCancel={() => setAddingResource(null)} onCreate={(input) => addResource("industry", input)} /> : null}<LocaleTabs locale={locale} onChange={setLocale} />{current ? <><ContentEditor value={current[locale] as unknown as JsonValue} onUpload={uploadMedia} onChange={(value) => update(["industries", selectedIndustry, locale], value)} /><section className="admin-editor-section"><h3>Industry media</h3><ContentEditor value={{ image: current.image }} onUpload={uploadMedia} onChange={(value) => update(["industries", selectedIndustry, "image"], (value as { image: string }).image)} /></section></> : null}</>;
   } else if (tab === "media") {
     editor = <MediaLibrary media={media} onUpload={uploadMedia} onDelete={(id) => setMedia((items) => items.filter((item) => item.id !== id))} />;
   } else if (tab === "enquiries") {
@@ -418,6 +459,84 @@ function LocaleTabs({ locale, onChange }: { locale: Locale; onChange: (value: Lo
 
 function ResourceSelect({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) {
   return <label className="admin-resource-select"><span>Choose item</span><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option value={option} key={option}>{titleFromKey(option)}</option>)}</select></label>;
+}
+
+function ResourceActions({
+  kind,
+  value,
+  options,
+  onChange,
+  onAdd,
+}: {
+  kind: AddableResource;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  onAdd: () => void;
+}) {
+  return (
+    <div className="admin-resource-actions">
+      <ResourceSelect value={value} options={options} onChange={onChange} />
+      <button className="admin-primary" type="button" onClick={onAdd}>Add {kind}</button>
+    </div>
+  );
+}
+
+function NewResourceForm({
+  kind,
+  existingSlugs,
+  onCancel,
+  onCreate,
+}: {
+  kind: AddableResource;
+  existingSlugs: string[];
+  onCancel: () => void;
+  onCreate: (input: NewResourceInput) => boolean;
+}) {
+  const [englishName, setEnglishName] = useState("");
+  const [arabicName, setArabicName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [slugEdited, setSlugEdited] = useState(false);
+  const [error, setError] = useState("");
+  const plural = kind === "product" ? "products" : "industries";
+
+  function changeEnglishName(value: string) {
+    setEnglishName(value);
+    if (!slugEdited) setSlug(slugifyResource(value.replace(/^UNU\s+/i, "")));
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const normalizedSlug = slugifyResource(slug);
+    if (!englishName.trim() || !arabicName.trim() || !normalizedSlug) {
+      setError("English name, Arabic name, and URL slug are required.");
+      return;
+    }
+    if (existingSlugs.includes(normalizedSlug)) {
+      setError(`The URL slug “${normalizedSlug}” is already in use.`);
+      return;
+    }
+    if (!onCreate({ slug: normalizedSlug, englishName, arabicName })) {
+      setError("This item could not be added. Check the URL slug and try again.");
+    }
+  }
+
+  return (
+    <form className="admin-create-panel" onSubmit={submit}>
+      <header>
+        <div><h3>Add {kind}</h3><p>Create the bilingual starting content now, then review every section before publishing.</p></div>
+        <button className="admin-danger-link" type="button" onClick={onCancel}>Cancel</button>
+      </header>
+      <div className="admin-create-grid">
+        <label className="admin-field"><span>English name</span><input autoFocus value={englishName} onChange={(event) => changeEnglishName(event.target.value)} placeholder={kind === "product" ? "UNU Field Service" : "Field services"} /></label>
+        <label className="admin-field" dir="rtl"><span>الاسم بالعربية</span><input value={arabicName} onChange={(event) => setArabicName(event.target.value)} placeholder={kind === "product" ? "UNU للخدمات الميدانية" : "الخدمات الميدانية"} /></label>
+        <label className="admin-field"><span>URL slug</span><input value={slug} onChange={(event) => { setSlugEdited(true); setSlug(slugifyResource(event.target.value)); }} placeholder="field-services" aria-describedby={`new-${kind}-path`} /></label>
+        <div className="admin-resource-path" id={`new-${kind}-path`}><span>Public paths</span><code>/{plural}/{slug || "url-slug"}</code><code>/ar/{plural}/{slug || "url-slug"}</code></div>
+      </div>
+      {error ? <p className="admin-form-error" role="alert">{error}</p> : null}
+      <div className="admin-create-actions"><button className="admin-primary" type="submit">Create {kind}</button><span>The new item stays unpublished until you save changes.</span></div>
+    </form>
+  );
 }
 
 function Overview({ content, media, enquiries, onNavigate }: { content: SiteContent; media: MediaAsset[]; enquiries: Enquiry[]; onNavigate: (tab: TabKey) => void }) {

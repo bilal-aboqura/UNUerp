@@ -176,10 +176,9 @@ export default async function ArabicRoute({
     return <Page locale="ar" content={site.global}><IndustriesPage items={items} page={site.pages.industries.ar} mediaSrc={site.media.industriesHero} /></Page>;
   }
   if (section === "industries" && slug) {
-    const entries = Object.entries(industryDetails);
-    const index = entries.findIndex(([key]) => key === slug);
-    if (index < 0) return notFound();
-    return <Page locale="ar" content={site.global}><IndustryDetail name={site.industries[slug]?.ar.name ?? arIndustries[index]} slug={slug} description={site.industries[slug]?.ar.summary} /></Page>;
+    const item = site.industries[slug]?.ar;
+    if (!item) return notFound();
+    return <Page locale="ar" content={site.global}><IndustryDetail name={item.name} slug={slug} description={item.summary} /></Page>;
   }
 
   const config = sectionCopy[section as keyof typeof sectionCopy];

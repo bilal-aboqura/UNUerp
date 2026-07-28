@@ -62,11 +62,30 @@ test("desktop navigation routes to features", async ({ page }) => {
   await expect(page).toHaveURL(/\/features$/);
 });
 
+test("desktop Products and Industries navigation expose dropdown links", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/");
+  const navigation = page.getByRole("navigation", { name: "Primary navigation" });
+
+  await navigation.getByRole("button", { name: "Open Products menu" }).click();
+  await expect(navigation.getByRole("link", { name: "UNU Exchange" })).toBeVisible();
+  await navigation.getByRole("link", { name: "UNU Exchange" }).click();
+  await expect(page).toHaveURL(/\/products\/exchange$/);
+
+  await page.goto("/");
+  await navigation.getByRole("button", { name: "Open Industries menu" }).click();
+  await expect(navigation.getByText("Production & infrastructure", { exact: true })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Manufacturing" })).toBeVisible();
+});
+
 test("mobile navigation opens, closes, and handles Escape", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await page.getByRole("button", { name: "Open navigation" }).click();
-  await expect(page.getByRole("navigation", { name: "Mobile navigation" })).toBeVisible();
+  const navigation = page.getByRole("navigation", { name: "Mobile navigation" });
+  await expect(navigation).toBeVisible();
+  await navigation.getByRole("button", { name: "Open Products menu" }).click();
+  await expect(navigation.getByRole("link", { name: "UNU Exchange" })).toBeVisible();
   await expect(page.locator("body")).toHaveCSS("overflow", "hidden");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("navigation", { name: "Mobile navigation" })).toBeHidden();

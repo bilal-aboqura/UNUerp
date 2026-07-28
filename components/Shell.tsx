@@ -25,7 +25,7 @@ export function Header({ locale = "en", content }: { locale?: Locale; content?: 
         <Link className="brand nav-logo" href={arabic ? "/ar" : "/"} aria-label={arabic ? "الرئيسية — UNU ERP" : "UNU ERP home"}>
           <Image src={content?.logo.src ?? "/assets/unu-logo.png"} alt="" width={187} height={99} priority />
         </Link>
-        <NavLinks items={items} label={arabic ? "التنقل الرئيسي" : "Primary navigation"} />
+        <NavLinks items={items} locale={locale} label={arabic ? "التنقل الرئيسي" : "Primary navigation"} />
         <div className="nav-actions">
           <LocaleSwitch className="lang" locale={locale} />
           <Link className="button small nav-cta" href={arabic ? "/ar/contact" : "/contact"}>{content?.cta[locale] ?? (arabic ? "اطلب عرضاً" : "Book a demo")}</Link>
