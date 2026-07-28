@@ -9,7 +9,7 @@ import { IndustryIcon } from "@/components/IndustryIcon";
 type IndustryItem = { slug: string; name: string; summary: string };
 const fallbackItems: IndustryItem[] = industries.map((name) => { const slug = slugify(name); return { slug, name, summary: englishIndustryCopy[slug] ?? "" }; });
 const groups = [
-  { id: "all", label: "All industries", indexes: industries.map((_, index) => index) },
+  { id: "all", label: "All industries", indexes: null },
   { id: "commerce", label: "Commerce & retail", indexes: [1, 2, 3, 4, 8, 20] },
   { id: "industry", label: "Industry & logistics", indexes: [0, 5, 10, 11] },
   { id: "services", label: "Services & institutions", indexes: [6, 7, 9, 15, 16, 17, 18] },
@@ -21,7 +21,8 @@ export function EnglishIndustryExplorer({ items = fallbackItems }: { items?: Ind
   const group = groups.find((item) => item.id === active) ?? groups[0];
   const visible = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("en");
-    return group.indexes.filter((index) => items[index] && (!normalized || `${items[index].name} ${items[index].summary}`.toLocaleLowerCase("en").includes(normalized)));
+    const indexes = group.indexes ?? items.map((_, index) => index);
+    return indexes.filter((index) => items[index] && (!normalized || `${items[index].name} ${items[index].summary}`.toLocaleLowerCase("en").includes(normalized)));
   }, [group.indexes, items, query]);
 
   return <div className="ar-industry-explorer">
