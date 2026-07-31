@@ -1,24 +1,17 @@
+/* eslint-disable @next/next/no-img-element -- Feature icons may be administrator-uploaded media. */
 import type { HTMLAttributes } from "react";
-
-const featureEmojis: Record<string, string> = {
-  crm: "💬",
-  sales: "📈",
-  accounting: "💰",
-  purchase: "🛒",
-  inventory: "📦",
-  hr: "👥",
-  projects: "📋",
-  ecommerce: "🛍️",
-  marketing: "📣",
-  helpdesk: "🎧",
-  pos: "🧾",
-  "no-code-studio": "🧩",
-};
+import { ManagedIcon } from "@/components/ManagedIcon";
 
 type FeatureIconProps = HTMLAttributes<HTMLSpanElement> & {
-  slug: string;
+  slug?: string;
+  icon?: string;
 };
 
-export function FeatureIcon({ slug, ...props }: FeatureIconProps) {
-  return <span {...props} className={`feature-emoji ${props.className ?? ""}`.trim()} aria-hidden="true">{featureEmojis[slug] ?? "✨"}</span>;
+export function FeatureIcon({ icon = "workflow", ...props }: FeatureIconProps) {
+  const uploaded = /^(https?:|data:|\/)/i.test(icon);
+  return (
+    <span {...props} className={`feature-emoji ${props.className ?? ""}`.trim()} aria-hidden="true">
+      {uploaded ? <img src={icon} alt="" /> : <ManagedIcon name={icon} />}
+    </span>
+  );
 }

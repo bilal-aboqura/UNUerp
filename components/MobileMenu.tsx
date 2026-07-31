@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { nav } from "@/lib/content";
 import type { Locale } from "@/components/Shell";
 import { LocaleSwitch } from "@/components/LocaleSwitch";
-import { getIndustryNavigationGroups, getNavigationChildren } from "@/lib/navigation";
+import { getNavigationChildren } from "@/lib/navigation";
 
 const arabicNav = [
   { label: "المزايا", href: "/ar/features" },
@@ -56,19 +56,13 @@ export function MobileMenu({ locale = "en", items: providedItems, ctaLabel }: { 
 
             const isDropdownOpen = openDropdown === item.href;
             const submenuId = `mobile-${locale}-${item.href.replace(/[^a-z0-9]+/gi, "-")}-menu`;
-            const groups = item.href.endsWith("/industries") ? getIndustryNavigationGroups(locale) : null;
             return (
               <div className="mobile-nav-group" key={item.href}>
                 <div className="mobile-nav-row">
                   <Link href={item.href} onClick={() => setOpen(false)}>{item.label}<span aria-hidden="true">{arabic ? "←" : "→"}</span></Link>
                   <button type="button" aria-label={arabic ? `فتح قائمة ${item.label}` : `Open ${item.label} menu`} aria-expanded={isDropdownOpen} aria-controls={submenuId} onClick={() => setOpenDropdown(isDropdownOpen ? null : item.href)}><span aria-hidden="true">⌄</span></button>
                 </div>
-                {isDropdownOpen && groups ? (
-                  <div id={submenuId} className="mobile-nav-submenu mobile-nav-submenu-groups">
-                    <Link className="mobile-nav-all" href={children[0].href} onClick={() => setOpen(false)}>{children[0].label}<span aria-hidden="true">{arabic ? "←" : "→"}</span></Link>
-                    {groups.map((group) => <section key={group.label}><strong>{group.label}</strong><ul>{group.items.map((child) => <li key={child.href}><Link href={child.href} onClick={() => setOpen(false)}>{child.label}<span aria-hidden="true">{arabic ? "←" : "→"}</span></Link></li>)}</ul></section>)}
-                  </div>
-                ) : isDropdownOpen ? (
+                {isDropdownOpen ? (
                   <ul id={submenuId} className="mobile-nav-submenu">{children.map((child) => <li key={child.href}><Link href={child.href} onClick={() => setOpen(false)}>{child.label}<span aria-hidden="true">{arabic ? "←" : "→"}</span></Link></li>)}</ul>
                 ) : null}
               </div>

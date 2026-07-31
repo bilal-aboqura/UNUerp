@@ -163,7 +163,7 @@ export function PageVisual({ variant, locale = "en", src: providedSrc }: { varia
       : variant === "industries" ? "Operations team working from shared warehouse data" : variant === "products" ? "Saudi business team working together with UNU products" : "Business team reviewing connected operational analytics";
     return (
       <div className="page-photo" style={{ position: "relative" }}>
-        <Image src={src} alt={alt} fill priority sizes="(max-width: 900px) 100vw, 44vw" />
+        <Image src={src} alt={alt} fill priority loading="eager" fetchPriority="high" sizes="(max-width: 900px) 100vw, 44vw" />
         <span>{ar ? "مصمم لعمليات المنطقة" : "Designed for regional operations"}</span>
       </div>
     );

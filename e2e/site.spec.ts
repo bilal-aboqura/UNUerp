@@ -74,8 +74,12 @@ test("desktop Products and Industries navigation expose dropdown links", async (
 
   await page.goto("/");
   await navigation.getByRole("button", { name: "Open Industries menu" }).click();
-  await expect(navigation.getByText("Production & infrastructure", { exact: true })).toBeVisible();
-  await expect(navigation.getByRole("link", { name: "Manufacturing" })).toBeVisible();
+  const productionCategory = navigation.getByRole("link", { name: "Production & infrastructure" });
+  await expect(productionCategory).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Manufacturing" })).toHaveCount(0);
+  await productionCategory.click();
+  await expect(page).toHaveURL(/\/industries#production-infrastructure$/);
+  await expect(page.getByRole("tab", { name: "Production & infrastructure" })).toHaveAttribute("aria-selected", "true");
 });
 
 test("mobile navigation opens, closes, and handles Escape", async ({ page }) => {
@@ -101,6 +105,14 @@ test("Arabic navigation order follows the localized information architecture", a
     "القطاعات",
     "الحلول والأسعار",
   ]);
+  const navigation = page.getByRole("navigation", { name: "التنقل الرئيسي" });
+  await navigation.getByRole("button", { name: "فتح قائمة القطاعات" }).click();
+  const productionCategory = navigation.getByRole("link", { name: "الإنتاج والبنية التحتية" });
+  await expect(productionCategory).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "التصنيع" })).toHaveCount(0);
+  await productionCategory.click();
+  await expect(page).toHaveURL(/\/ar\/industries#production-infrastructure$/);
+  await expect(page.getByRole("tab", { name: "الإنتاج والبنية التحتية" })).toHaveAttribute("aria-selected", "true");
 });
 
 test("Arabic typography and mixed-direction form values remain correct", async ({ page }) => {
@@ -117,7 +129,7 @@ test("hero calls to action reach their intended routes", async ({ page }) => {
   await page.getByRole("link", { name: "Book a tailored demo", exact: true }).click();
   await expect(page).toHaveURL(/\/contact$/);
   await page.goto("/ar");
-  await page.getByRole("link", { name: "استكشف المنصة" }).click();
+  await page.locator('.home-hero a[href="/ar/features"]').click();
   await expect(page).toHaveURL(/\/ar\/features$/);
 });
 
@@ -149,7 +161,7 @@ test("Arabic contact validation, confirmation, and reset flow", async ({ page })
   await page.getByLabel("الاسم الكامل *").fill("مستخدم تجريبي");
   await page.getByLabel("البريد الإلكتروني للعمل *").fill("test@example.com");
   await page.getByLabel("الشركة *").fill("شركة تجريبية");
-  await page.getByLabel("القطاع").selectOption({ label: "التقنية" });
+  await page.locator('select[name="industry"]').selectOption({ label: "التقنية" });
   await page.getByRole("button", { name: "إرسال طلب العرض" }).click();
   await expect(page.getByRole("status")).toContainText("تم إرسال طلبك");
   await page.getByRole("button", { name: "تعديل البيانات" }).click();
@@ -210,4 +222,34 @@ test("the ERP command center remains fully contained in English and Arabic", asy
       expect(bounds.right, `${route} console escaped the inline end at ${width}px`).toBeLessThanOrEqual(bounds.viewport);
     }
   }
+});
+
+test("feature groups reveal remaining items without a reload", async ({ page }) => {
+  await page.goto("/features");
+  const firstGroup = page.locator(".feature-group").first();
+  await expect(firstGroup.locator(".feature-group-grid > a")).toHaveCount(4);
+  const url = page.url();
+  await firstGroup.getByRole("button", { name: "Show More" }).click();
+  await expect(firstGroup.locator(".feature-group-grid > a")).toHaveCount(8);
+  await expect(firstGroup.getByRole("button", { name: "Show More" })).toHaveCount(0);
+  expect(page.url()).toBe(url);
+});
+
+test("managed WhatsApp, footer direction, pricing, icons, and video are accessible", async ({ page }) => {
+  await page.goto("/products/exchange");
+  await expect(page.locator(".ar-capability-list .capability-icon svg").first()).toBeVisible();
+  await expect(page.locator(".ar-product-video-frame video")).toHaveCSS("object-fit", "contain");
+  const whatsapp = page.getByRole("link", { name: "Chat with UNU on WhatsApp" });
+  await expect(whatsapp).toHaveAttribute("href", /^https:\/\/wa\.me\/\d+(\?text=.+)?$/);
+  await expect(whatsapp).toHaveAttribute("target", "_blank");
+  await expect(page.locator("footer")).toHaveCSS("text-align", "left");
+
+  await page.goto("/pricing");
+  await expect(page.locator(".pricing-managed-plans article")).toHaveCount(3);
+
+  await page.goto("/ar");
+  const arabicWhatsapp = page.getByRole("link", { name: "تواصل مع UNU عبر واتساب" });
+  await expect(arabicWhatsapp).toHaveClass(/is-left/);
+  expect((await arabicWhatsapp.boundingBox())?.x).toBeLessThan(80);
+  await expect(page.locator("footer")).toHaveCSS("text-align", "right");
 });

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
-  getIndustryNavigationGroups,
   getNavigationChildren,
   type NavigationLocale,
 } from "@/lib/navigation";
@@ -47,7 +46,6 @@ export function NavLinks({
           return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}>{item.label}</Link>;
         }
 
-        const isIndustries = item.href.endsWith("/industries");
         const menuId = `${locale}-${item.href.replace(/[^a-z0-9]+/gi, "-")}-menu`;
         const isOpen = openMenu === item.href;
 
@@ -73,28 +71,9 @@ export function NavLinks({
               </button>
             </div>
 
-            {isIndustries ? (
-              <ul id={menuId} className="nav-dropdown-menu is-industries">
-                <li className="nav-dropdown-overview">
-                  <Link href={children[0].href} aria-current={pathname === children[0].href ? "page" : undefined} onClick={closeMenu}>
-                    <span><small>{locale === "ar" ? "21 قطاعاً" : "21 industries"}</small>{children[0].label}</span>
-                    <span aria-hidden="true">{locale === "ar" ? "استكشف ←" : "Explore →"}</span>
-                  </Link>
-                </li>
-                {getIndustryNavigationGroups(locale).map((group) => (
-                  <li className="nav-dropdown-group" key={group.label}>
-                    <strong>{group.label}</strong>
-                    <ul>
-                      {group.items.map((child) => <li key={child.href}><Link href={child.href} aria-current={pathname === child.href ? "page" : undefined} onClick={closeMenu}><span>{child.label}</span><span aria-hidden="true">→</span></Link></li>)}
-                    </ul>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <ul id={menuId} className="nav-dropdown-menu">
-                {children.map((child, index) => <li className={index === 0 ? "nav-dropdown-overview" : undefined} key={child.href}><Link href={child.href} aria-current={pathname === child.href ? "page" : undefined} onClick={closeMenu}><span>{child.label}</span><span aria-hidden="true">→</span></Link></li>)}
-              </ul>
-            )}
+            <ul id={menuId} className="nav-dropdown-menu">
+              {children.map((child, index) => <li className={index === 0 ? "nav-dropdown-overview" : undefined} key={child.href}><Link href={child.href} aria-current={pathname === child.href ? "page" : undefined} onClick={closeMenu}><span>{child.label}</span><span aria-hidden="true">→</span></Link></li>)}
+            </ul>
           </div>
         );
       })}

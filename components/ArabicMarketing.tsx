@@ -7,6 +7,9 @@ import {
   type ArabicProductPage,
 } from "@/lib/ar-marketing-content";
 import { WorkflowMarquee } from "@/components/WorkflowMarquee";
+import { ManagedIcon, suggestedIcon } from "@/components/ManagedIcon";
+import { PricingPlans } from "@/components/PricingPlans";
+import type { PricingPlan } from "@/lib/site-content";
 
 const Arrow = () => <span aria-hidden="true">↗</span>;
 
@@ -212,7 +215,7 @@ export function ArabicProductDetail({ page, image, imageAlt }: { page: ArabicPro
           <div className="ar-capability-list">
             {page.capabilities.map((capability, index) => (
               <article key={capability.title}>
-                <span>0{index + 1}</span>
+                <span className="capability-icon"><ManagedIcon name={capability.icon ?? suggestedIcon(capability.title, index)} /></span>
                 <h3>{capability.title}</h3>
                 <p>{capability.text}</p>
               </article>
@@ -296,7 +299,7 @@ function ArabicProductVideo({ page }: { page: ArabicProductPage }) {
   );
 }
 
-export function ArabicPricingPage({ pricing, pageContent }: { pricing?: { factors: string[]; planNames: string[]; note: string }; pageContent?: { signal: string; title: string; intro: string; cta?: string } }) {
+export function ArabicPricingPage({ pricing, pageContent }: { pricing?: { factors: string[]; planNames: string[]; note: string; plans?: PricingPlan[] }; pageContent?: { signal: string; title: string; intro: string; cta?: string } }) {
   const factors = [
     ["عدد المستخدمين", "حجم الوصول المتزامن والأدوار المطلوبة."],
     ["الوحدات المطلوبة", "المحاسبة والموارد البشرية والمخزون والمبيعات وغيرها."],
@@ -304,11 +307,6 @@ export function ArabicPricingPage({ pricing, pageContent }: { pricing?: { factor
     ["التخصيص", "تهيئة النظام وفق إجراءات العمل الخاصة بالمؤسسة."],
     ["التدريب والدعم", "عدد الفرق ونطاق التدريب ومستوى الخدمة."],
     ["الاستضافة", "خيار سحابي أو محلي وفق متطلبات المشروع."],
-  ];
-  const plans = [
-    { name: "Starter", label: "للشركات الصغيرة", items: ["وحدات أساسية", "فريق صغير", "دعم قياسي"] },
-    { name: "Business", label: "للشركات المتوسطة", items: ["وحدات متعددة", "تكاملات مختارة", "تقارير متقدمة"] },
-    { name: "Enterprise", label: "للمؤسسات الكبيرة", items: ["عدة فروع", "سير عمل مخصص", "اتفاقية خدمة"] },
   ];
   return (
     <>
@@ -345,12 +343,7 @@ export function ArabicPricingPage({ pricing, pageContent }: { pricing?: { factor
         </div>
       </section>
 
-      <section className="section ar-plan-section">
-        <div className="wrap">
-          <header className="ar-section-head compact"><div><span>اختر نقطة البداية</span><h2>فئات نطاق، وليست أسعاراً جامدة</h2></div></header>
-          <div className="ar-plans">{plans.map((plan, index) => <article key={plan.name} className={index === 1 ? "is-featured" : ""}><span>{plan.label}</span><h3>{plan.name}</h3><ul>{plan.items.map((item) => <li key={item}>✓ {item}</li>)}</ul><a href="#quote" className="button secondary">اطلب عرضاً</a></article>)}</div>
-        </div>
-      </section>
+      <PricingPlans plans={pricing?.plans ?? []} locale="ar" />
 
       <section className="section ar-process-section">
         <div className="wrap">

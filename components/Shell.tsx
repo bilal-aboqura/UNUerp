@@ -5,6 +5,7 @@ import { MobileMenu } from "@/components/MobileMenu";
 import { LocaleSwitch } from "@/components/LocaleSwitch";
 import { NavLinks } from "@/components/NavLinks";
 import { SiteMotion } from "@/components/SiteMotion";
+import { FloatingWhatsapp, FooterSocialLinks } from "@/components/SocialLinks";
 import type { SiteContent } from "@/lib/site-content";
 
 export type Locale = "en" | "ar";
@@ -48,6 +49,7 @@ export function Footer({ locale = "en", content }: { locale?: Locale; content?: 
           <div className="brand light"><Image src={content?.logo.src ?? "/assets/unu-logo.png"} alt={content?.logo.alt ?? "UNU ERP"} width={187} height={99} /></div>
           <p>{footer?.tagline ?? (arabic ? "حلول ذكية ومترابطة ومفتوحة المصدر تساعد الشركات على إدارة عملياتها بوضوح وكفاءة أكبر." : "Intelligent, connected, open-source business management for growing enterprises.")}</p>
           <span className="footer-trust"><i />{footer?.trust ?? (arabic ? "منصة مرنة. بيانات تحت تحكمك." : "One flexible platform. Your data under your control.")}</span>
+          {content ? <FooterSocialLinks links={content.socialLinks} /> : null}
         </div>
         <div className="footer-links">
           <strong>{arabic ? "استكشف" : "Explore"}</strong>
@@ -81,6 +83,7 @@ export function Page({ children, locale = "en", content }: { children: React.Rea
       <Header locale={locale} content={content} />
       <main id="main-content">{children}</main>
       <Footer locale={locale} content={content} />
+      {content ? <FloatingWhatsapp settings={content.whatsapp} locale={locale} /> : null}
     </div>
   );
 }

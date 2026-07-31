@@ -10,8 +10,9 @@ export function generateStaticParams() { return Object.keys(featureDetails).map(
 export default async function Feature({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const site = await readSiteContent();
-  const item = site.features[slug]?.en;
-  if (!item) notFound();
+  const feature = site.features[slug];
+  const item = feature?.en;
+  if (!item || !feature.published) notFound();
   return (
     <Page content={site.global}>
       <section className="detail-hero"><div className="wrap detail-grid"><div><span className="signal">UNU ERP · {item.name}</span><h1>{item.headline}</h1><p>{item.intro}</p><Link className="button" href="/contact">Book a {item.name} demo</Link></div><DetailVisual label={item.name} /></div></section>

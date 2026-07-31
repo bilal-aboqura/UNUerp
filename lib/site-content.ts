@@ -23,6 +23,22 @@ import { createPublicServerClient } from "@/lib/supabase/server";
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 
+export type FeatureSection = "business" | "specialized";
+export type SocialPlatform = "facebook" | "instagram" | "linkedin" | "x" | "youtube" | "tiktok" | "whatsapp";
+
+export type PricingPlan = {
+  id: string;
+  name: { en: string; ar: string };
+  description: { en: string; ar: string };
+  price: { monthly: string; yearly: string; currency: string };
+  billingPeriod: { en: string; ar: string };
+  cta: { en: string; ar: string };
+  features: { id: string; label: { en: string; ar: string } }[];
+  recommended: boolean;
+  published: boolean;
+  order: number;
+};
+
 export type SiteContent = {
   version: number;
   global: {
@@ -46,6 +62,18 @@ export type SiteContent = {
       en: { tagline: string; trust: string; legal: string };
       ar: { tagline: string; trust: string; legal: string };
     };
+    whatsapp: {
+      phone: string;
+      message: { en: string; ar: string };
+      visible: boolean;
+      position: "auto" | "left" | "right";
+    };
+    socialLinks: {
+      id: string;
+      platform: SocialPlatform;
+      url: string;
+      enabled: boolean;
+    }[];
   };
   media: {
     hero: string;
@@ -68,6 +96,10 @@ export type SiteContent = {
   features: Record<
     string,
     {
+      icon: string;
+      section: FeatureSection;
+      published: boolean;
+      order: number;
       en: { name: string; headline: string; intro: string; benefits: string[] };
       ar: { name: string; headline: string; intro: string; benefits: string[] };
     }
@@ -93,8 +125,12 @@ export type SiteContent = {
   pricing: {
     en: { factors: string[]; planNames: string[]; note: string };
     ar: { factors: string[]; planNames: string[]; note: string };
+    plans: PricingPlan[];
   };
 };
+
+const defaultFeatureIcons = ["chat", "trend", "calculator", "cart", "inventory", "users", "projects", "store", "megaphone", "headset", "receipt", "workflow"];
+const managedIconFallbacks = ["shield", "link", "wallet", "inventory", "analytics", "users", "workflow"];
 
 const arNav = [
   { label: "المزايا", href: "/ar/features" },
@@ -108,6 +144,10 @@ function defaultFeatures(): SiteContent["features"] {
     Object.entries(featureDetails).map(([slug, item], index) => [
       slug,
       {
+        icon: defaultFeatureIcons[index] ?? "workflow",
+        section: index < 8 ? "business" : "specialized",
+        published: true,
+        order: index,
         en: item,
         ar: {
           name: arModules[index] ?? item.name,
@@ -121,6 +161,13 @@ function defaultFeatures(): SiteContent["features"] {
 }
 
 function defaultProducts(): SiteContent["products"] {
+  const capabilityIcons: Record<string, string[]> = {
+    exchange: ["shield", "link", "wallet", "inventory", "globe"],
+    chat: ["chat", "workflow", "analytics", "users"],
+    "health-care": ["users", "calendar", "wallet", "analytics", "inventory"],
+    flow: ["workflow", "link", "users", "analytics"],
+    retail: ["store", "inventory", "cart", "wallet", "analytics"],
+  };
   const enCatalog = Object.fromEntries(englishProductCatalog.map((item) => [item.slug, item]));
   const arCatalog = Object.fromEntries(arabicProductCatalog.map((item) => [item.slug, item]));
   return Object.fromEntries(
@@ -129,6 +176,7 @@ function defaultProducts(): SiteContent["products"] {
       {
         en: {
           ...(englishProductPages[slug] as unknown as Record<string, JsonValue>),
+          capabilities: englishProductPages[slug].capabilities.map((capability, index) => ({ ...capability, icon: capabilityIcons[slug]?.[index] ?? "workflow" })),
           featuresLabel: "Operational scope",
           featuresTitle: "Practical daily capabilities for teams and management",
           featuresIntro: "Final modules and integrations are defined after reviewing your workflows and current systems.",
@@ -151,6 +199,7 @@ function defaultProducts(): SiteContent["products"] {
         } as unknown as JsonValue,
         ar: {
           ...(arabicProductPages[slug] as unknown as Record<string, JsonValue>),
+          capabilities: arabicProductPages[slug].capabilities.map((capability, index) => ({ ...capability, icon: capabilityIcons[slug]?.[index] ?? "workflow" })),
           featuresLabel: "نطاق العمل",
           featuresTitle: "قدرات يومية واضحة لفرق التشغيل والإدارة",
           featuresIntro: "تُحدد الوحدات والتكاملات النهائية بعد فهم إجراءات العمل والأنظمة الحالية.",
@@ -251,6 +300,16 @@ export const defaultSiteContent: SiteContent = {
         legal: "صُمم للشركات التي تشكل مستقبل المملكة العربية السعودية.",
       },
     },
+    whatsapp: {
+      phone: "+966112248822",
+      message: {
+        en: "Hello, I would like to learn more about UNU ERP.",
+        ar: "مرحباً، أود معرفة المزيد عن حلول UNU ERP.",
+      },
+      visible: true,
+      position: "auto",
+    },
+    socialLinks: [],
   },
   media: {
     hero: "/assets/hero.jpeg",
@@ -300,6 +359,56 @@ export const defaultSiteContent: SiteContent = {
       planNames: ["الأساسي", "النمو", "المؤسسات"],
       note: "يتم إعداد كل عرض سعر بناءً على سير العمل ومتطلبات التنفيذ.",
     },
+    plans: [
+      {
+        id: "essential",
+        name: { en: "Essential", ar: "الأساسي" },
+        description: { en: "A focused starting point for smaller teams.", ar: "نقطة بداية مركزة للفرق الصغيرة." },
+        price: { monthly: "Custom", yearly: "Custom", currency: "SAR" },
+        billingPeriod: { en: "Tailored scope", ar: "نطاق مخصص" },
+        cta: { en: "Request a quote", ar: "اطلب عرض سعر" },
+        features: [
+          { id: "essential-core", label: { en: "Core modules", ar: "الوحدات الأساسية" } },
+          { id: "essential-team", label: { en: "Focused team access", ar: "وصول لفريق محدد" } },
+          { id: "essential-support", label: { en: "Standard support", ar: "دعم قياسي" } },
+        ],
+        recommended: false,
+        published: true,
+        order: 0,
+      },
+      {
+        id: "growth",
+        name: { en: "Growth", ar: "النمو" },
+        description: { en: "Connected capabilities for growing operations.", ar: "قدرات مترابطة للعمليات المتنامية." },
+        price: { monthly: "Custom", yearly: "Custom", currency: "SAR" },
+        billingPeriod: { en: "Tailored scope", ar: "نطاق مخصص" },
+        cta: { en: "Request a quote", ar: "اطلب عرض سعر" },
+        features: [
+          { id: "growth-modules", label: { en: "Multiple modules", ar: "وحدات متعددة" } },
+          { id: "growth-integrations", label: { en: "Selected integrations", ar: "تكاملات مختارة" } },
+          { id: "growth-reporting", label: { en: "Advanced reporting", ar: "تقارير متقدمة" } },
+        ],
+        recommended: true,
+        published: true,
+        order: 1,
+      },
+      {
+        id: "enterprise",
+        name: { en: "Enterprise", ar: "المؤسسات" },
+        description: { en: "Configured for complex, multi-branch organizations.", ar: "مهيأ للمؤسسات المعقدة ومتعددة الفروع." },
+        price: { monthly: "Custom", yearly: "Custom", currency: "SAR" },
+        billingPeriod: { en: "Tailored scope", ar: "نطاق مخصص" },
+        cta: { en: "Talk to an expert", ar: "تحدث مع خبير" },
+        features: [
+          { id: "enterprise-branches", label: { en: "Multiple branches", ar: "عدة فروع" } },
+          { id: "enterprise-workflows", label: { en: "Configured workflows", ar: "سير عمل مخصص" } },
+          { id: "enterprise-service", label: { en: "Service agreement", ar: "اتفاقية خدمة" } },
+        ],
+        recommended: false,
+        published: true,
+        order: 2,
+      },
+    ],
   },
 };
 
@@ -329,5 +438,30 @@ export const readSiteContent = cache(async (): Promise<SiteContent> => {
     .maybeSingle();
 
   if (error || !data?.content) return cloneDefaultSiteContent();
-  return mergeContent(defaultSiteContent as unknown as JsonValue, data.content as JsonValue) as unknown as SiteContent;
+  const merged = mergeContent(defaultSiteContent as unknown as JsonValue, data.content as JsonValue) as unknown as SiteContent;
+  Object.entries(merged.features).forEach(([slug, feature], index) => {
+    feature.icon ||= defaultFeatureIcons[index] ?? "workflow";
+    feature.section ||= index < 8 ? "business" : "specialized";
+    feature.published = feature.published !== false;
+    feature.order = Number.isFinite(feature.order) ? feature.order : index;
+    merged.features[slug] = feature;
+  });
+  merged.pricing.plans = (merged.pricing.plans ?? defaultSiteContent.pricing.plans).map((plan, index) => ({
+    ...plan,
+    published: plan.published !== false,
+    recommended: plan.recommended === true,
+    order: Number.isFinite(plan.order) ? plan.order : index,
+  }));
+  Object.values(merged.products).forEach((product) => {
+    (["en", "ar"] as const).forEach((locale) => {
+      const page = product[locale] as { capabilities?: Array<{ title: string; text: string; icon?: string }> };
+      if (Array.isArray(page.capabilities)) {
+        page.capabilities = page.capabilities.map((capability, index) => ({
+          ...capability,
+          icon: capability.icon || managedIconFallbacks[index % managedIconFallbacks.length],
+        }));
+      }
+    });
+  });
+  return merged;
 });

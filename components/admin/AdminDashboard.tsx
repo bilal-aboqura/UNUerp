@@ -5,13 +5,16 @@ import { ChangeEvent, DragEvent, FormEvent, ReactNode, useEffect, useEffectEvent
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  createFeatureResource,
   createIndustryResource,
   createProductResource,
   slugifyResource,
   type NewResourceInput,
 } from "@/lib/admin-content-resources";
+import { managedIconOptions } from "@/components/ManagedIcon";
+import { normalizeWhatsappPhone, validateSiteContent } from "@/lib/communication";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-import type { JsonValue, SiteContent } from "@/lib/site-content";
+import type { JsonValue, PricingPlan, SiteContent, SocialPlatform } from "@/lib/site-content";
 
 export type MediaAsset = {
   id: string;
@@ -39,9 +42,9 @@ export type Enquiry = {
   admin_notes: string;
 };
 
-type TabKey = "overview" | "homepage" | "products" | "features" | "industries" | "media" | "enquiries" | "settings";
+type TabKey = "overview" | "homepage" | "products" | "features" | "industries" | "pricing" | "media" | "enquiries" | "settings";
 type Locale = "en" | "ar";
-type AddableResource = "product" | "industry";
+type AddableResource = "product" | "industry" | "feature";
 
 const tabs: { key: TabKey; label: string }[] = [
   { key: "overview", label: "Overview" },
@@ -49,6 +52,7 @@ const tabs: { key: TabKey; label: string }[] = [
   { key: "products", label: "Products" },
   { key: "features", label: "Features" },
   { key: "industries", label: "Industries" },
+  { key: "pricing", label: "Pricing" },
   { key: "media", label: "Media" },
   { key: "enquiries", label: "Enquiries" },
   { key: "settings", label: "Settings" },
@@ -56,6 +60,12 @@ const tabs: { key: TabKey; label: string }[] = [
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function uniqueId(prefix: string, existing: string[]) {
+  let index = existing.length + 1;
+  while (existing.includes(`${prefix}-${index}`)) index += 1;
+  return `${prefix}-${index}`;
 }
 
 type MediaUploadTicket = { token: string; signedUrl: string; storagePath: string; publicUrl: string };
@@ -142,6 +152,10 @@ function EditorField({
     return <label className="admin-field"><span>{label}</span><input type="number" value={value} onChange={(event) => onChange(Number(event.target.value))} /></label>;
   }
   if (typeof value !== "string") return null;
+
+  if (fieldKey.toLowerCase() === "icon") {
+    return <label className="admin-field"><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)}>{managedIconOptions.map((icon) => <option value={icon} key={icon}>{titleFromKey(icon)}</option>)}</select></label>;
+  }
 
   const multiline = value.length > 100 || /(intro|description|text|answer|note|tagline|legal)/i.test(fieldKey);
   const image = isImageKey(fieldKey, value, mediaKind);
@@ -290,15 +304,18 @@ export function AdminDashboard({
   function addResource(kind: AddableResource, input: NewResourceInput) {
     const slug = slugifyResource(input.slug);
     const next = clone(content);
-    const collection = kind === "product" ? next.products : next.industries;
+    const collection = kind === "product" ? next.products : kind === "industry" ? next.industries : next.features;
     if (!slug || slug in collection) return false;
 
     if (kind === "product") {
       next.products[slug] = createProductResource({ ...input, slug });
       setSelectedProduct(slug);
-    } else {
+    } else if (kind === "industry") {
       next.industries[slug] = createIndustryResource({ ...input, slug });
       setSelectedIndustry(slug);
+    } else {
+      next.features[slug] = createFeatureResource({ ...input, slug }, Object.keys(next.features).length);
+      setSelectedFeature(slug);
     }
 
     setContent(next);
@@ -307,6 +324,31 @@ export function AdminDashboard({
     setDirty(true);
     setStatus({ tone: "dirty", message: `New ${kind} added. Review and save to publish.` });
     return true;
+  }
+
+  function deleteFeature(slug: string) {
+    if (!window.confirm(`Delete the feature “${content.features[slug]?.en.name ?? slug}”? This takes effect after publishing.`)) return;
+    const next = clone(content);
+    delete next.features[slug];
+    const ordered = Object.entries(next.features).sort((a, b) => a[1].order - b[1].order);
+    ordered.forEach(([, item], index) => { item.order = index; });
+    setContent(next);
+    setSelectedFeature(ordered[0]?.[0] ?? "");
+    setDirty(true);
+    setStatus({ tone: "dirty", message: "Feature deleted. Save to publish this change." });
+  }
+
+  function moveFeature(slug: string, direction: -1 | 1) {
+    const ordered = Object.entries(content.features).sort((a, b) => a[1].order - b[1].order);
+    const index = ordered.findIndex(([key]) => key === slug);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= ordered.length) return;
+    [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
+    const next = clone(content);
+    ordered.forEach(([key], itemIndex) => { next.features[key].order = itemIndex; });
+    setContent(next);
+    setDirty(true);
+    setStatus({ tone: "dirty", message: "Feature order updated. Save to publish." });
   }
 
   async function uploadMedia(file: File, options: MediaUploadOptions = {}) {
@@ -365,6 +407,11 @@ export function AdminDashboard({
   }
 
   async function save() {
+    const validationError = validateSiteContent(content);
+    if (validationError) {
+      setStatus({ tone: "error", message: validationError });
+      return;
+    }
     setSaving(true);
     setStatus({ tone: "saving", message: "Publishing changes…" });
     const response = await fetch("/api/admin/content", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(content) });
@@ -384,6 +431,7 @@ export function AdminDashboard({
     const liveContent = clone(baseline);
     setContent(liveContent);
     if (!liveContent.products[selectedProduct]) setSelectedProduct(Object.keys(liveContent.products)[0] ?? "");
+    if (!liveContent.features[selectedFeature]) setSelectedFeature(Object.keys(liveContent.features)[0] ?? "");
     if (!liveContent.industries[selectedIndustry]) setSelectedIndustry(Object.keys(liveContent.industries)[0] ?? "");
     setAddingResource(null);
     setDirty(false);
@@ -424,16 +472,19 @@ export function AdminDashboard({
     editor = <><PanelHeader title="Products" body="Manage product cards, full product pages, editable section copy, FAQs, workflows, and product media." action={<ResourceActions kind="product" value={selectedProduct} options={Object.keys(content.products)} onChange={setSelectedProduct} onAdd={() => setAddingResource(addingResource === "product" ? null : "product")} />} />{addingResource === "product" ? <NewResourceForm kind="product" existingSlugs={Object.keys(content.products)} onCancel={() => setAddingResource(null)} onCreate={(input) => addResource("product", input)} /> : null}<LocaleTabs locale={locale} onChange={setLocale} />{current ? <><section className="admin-editor-section"><h3>Catalog card</h3><ContentEditor value={current.catalog[locale]} onUpload={uploadMedia} onChange={(value) => update(["products", selectedProduct, "catalog", locale], value)} /></section><section className="admin-editor-section"><h3>Product page</h3><ContentEditor value={current[locale]} onUpload={uploadMedia} onChange={(value) => update(["products", selectedProduct, locale], value)} /></section><section className="admin-editor-section"><h3>Product demo video</h3><p className="admin-editor-help">Upload a replacement video here. The video is shown in the product detail page; leave the URL empty to keep the standard call-to-action.</p><ContentEditor value={productPage?.demoVideo ?? { src: "", poster: "", title: "", description: "" }} mediaKind="video" onUpload={uploadMedia} onChange={(value) => update(["products", selectedProduct, locale, "demoVideo"], value)} /></section><section className="admin-editor-section"><h3>Dashboard replacement image</h3><p className="admin-editor-help">Upload a real product screenshot here to replace the illustrated dashboard in the product hero. Keep the image blank to use the illustration.</p><ContentEditor value={{ image: current.image, imageAlt: current.imageAlt[locale] }} onUpload={uploadMedia} onChange={(value) => { const item = value as { image: string; imageAlt: string }; updateMany([{ path: ["products", selectedProduct, "image"], value: item.image }, { path: ["products", selectedProduct, "imageAlt", locale], value: item.imageAlt }]); }} /></section></> : null}</>;
   } else if (tab === "features") {
     const current = content.features[selectedFeature];
-    editor = <><PanelHeader title="Features" body="Edit every ERP capability, benefit, headline, and localized description." action={<ResourceSelect value={selectedFeature} options={Object.keys(content.features)} onChange={setSelectedFeature} />} /><LocaleTabs locale={locale} onChange={setLocale} />{current ? <ContentEditor value={current[locale] as unknown as JsonValue} onUpload={uploadMedia} onChange={(value) => update(["features", selectedFeature, locale], value)} /> : null}</>;
+    const orderedFeatures = Object.keys(content.features).sort((a, b) => content.features[a].order - content.features[b].order);
+    editor = <><PanelHeader title="Features" body="Create, localize, publish, group, reorder, and assign meaningful icons to public feature pages." action={<ResourceActions kind="feature" value={selectedFeature} options={orderedFeatures} onChange={setSelectedFeature} onAdd={() => setAddingResource(addingResource === "feature" ? null : "feature")} />} />{addingResource === "feature" ? <NewResourceForm kind="feature" existingSlugs={Object.keys(content.features)} onCancel={() => setAddingResource(null)} onCreate={(input) => addResource("feature", input)} /> : null}{current ? <><div className="admin-feature-toolbar"><label className="admin-check"><input type="checkbox" checked={current.published} onChange={(event) => update(["features", selectedFeature, "published"], event.target.checked)} /><span>Published</span></label><label className="admin-field"><span>Feature group</span><select value={current.section} onChange={(event) => update(["features", selectedFeature, "section"], event.target.value)}><option value="business">Everything You Need to Manage Your Business</option><option value="specialized">Specialized Solutions Built on the Same Platform</option></select></label><label className="admin-field"><span>Icon</span><select value={/^(https?:|data:|\/)/i.test(current.icon) ? "" : current.icon} onChange={(event) => event.target.value && update(["features", selectedFeature, "icon"], event.target.value)}><option value="">Uploaded icon</option>{managedIconOptions.map((icon) => <option value={icon} key={icon}>{titleFromKey(icon)}</option>)}</select></label><label className="admin-upload-button">Upload icon<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; const url = await uploadMedia(file); if (url) update(["features", selectedFeature, "icon"], url); event.target.value = ""; }} /></label><div className="admin-order-actions"><button className="admin-secondary" type="button" onClick={() => moveFeature(selectedFeature, -1)}>Move up</button><button className="admin-secondary" type="button" onClick={() => moveFeature(selectedFeature, 1)}>Move down</button><button className="admin-danger-link" type="button" onClick={() => deleteFeature(selectedFeature)}>Delete feature</button></div></div><LocaleTabs locale={locale} onChange={setLocale} /><ContentEditor value={current[locale] as unknown as JsonValue} onUpload={uploadMedia} onChange={(value) => update(["features", selectedFeature, locale], value)} /></> : <p className="admin-empty">No features yet. Add the first bilingual feature to begin.</p>}</>;
   } else if (tab === "industries") {
     const current = content.industries[selectedIndustry];
     editor = <><PanelHeader title="Industries" body="Manage industry names, summaries, detailed page copy, and imagery." action={<ResourceActions kind="industry" value={selectedIndustry} options={Object.keys(content.industries)} onChange={setSelectedIndustry} onAdd={() => setAddingResource(addingResource === "industry" ? null : "industry")} />} />{addingResource === "industry" ? <NewResourceForm kind="industry" existingSlugs={Object.keys(content.industries)} onCancel={() => setAddingResource(null)} onCreate={(input) => addResource("industry", input)} /> : null}<LocaleTabs locale={locale} onChange={setLocale} />{current ? <><ContentEditor value={current[locale] as unknown as JsonValue} onUpload={uploadMedia} onChange={(value) => update(["industries", selectedIndustry, locale], value)} /><section className="admin-editor-section"><h3>Industry media</h3><ContentEditor value={{ image: current.image }} onUpload={uploadMedia} onChange={(value) => update(["industries", selectedIndustry, "image"], (value as { image: string }).image)} /></section></> : null}</>;
+  } else if (tab === "pricing") {
+    editor = <PricingManager content={content} locale={locale} onLocaleChange={setLocale} onUpdate={update} />;
   } else if (tab === "media") {
     editor = <MediaLibrary media={media} onUpload={uploadMedia} onDelete={(id) => setMedia((items) => items.filter((item) => item.id !== id))} />;
   } else if (tab === "enquiries") {
     editor = <EnquiryInbox enquiries={enquiries} onChange={setEnquiries} />;
   } else {
-    editor = <><PanelHeader title="Settings" body="Manage site identity, SEO, navigation, contact details, page headers, and pricing content." /><section className="admin-editor-section"><h3>Global settings</h3><ContentEditor value={content.global as unknown as JsonValue} onUpload={uploadMedia} onChange={(value) => update(["global"], value)} /></section><section className="admin-editor-section"><h3>Page headers</h3><ContentEditor value={content.pages as unknown as JsonValue} onUpload={uploadMedia} onChange={(value) => update(["pages"], value)} /></section><section className="admin-editor-section"><h3>Pricing content</h3><ContentEditor value={content.pricing as unknown as JsonValue} onUpload={uploadMedia} onChange={(value) => update(["pricing"], value)} /></section></>;
+    editor = <><PanelHeader title="Settings" body="Manage site identity, SEO, navigation, contact details, WhatsApp, and footer social links." /><CommunicationSettings value={content.global} onChange={(value) => update(["global"], value as unknown as JsonValue)} /><section className="admin-editor-section"><h3>Global settings</h3><ContentEditor value={content.global as unknown as JsonValue} excludeKeys={["whatsapp", "socialLinks"]} onUpload={uploadMedia} onChange={(value) => update(["global"], value)} /></section><section className="admin-editor-section"><h3>Page headers</h3><ContentEditor value={content.pages as unknown as JsonValue} onUpload={uploadMedia} onChange={(value) => update(["pages"], value)} /></section></>;
   }
 
   return (
@@ -453,12 +504,82 @@ export function AdminDashboard({
   );
 }
 
+function PricingManager({ content, locale, onLocaleChange, onUpdate }: { content: SiteContent; locale: Locale; onLocaleChange: (locale: Locale) => void; onUpdate: (path: (string | number)[], value: JsonValue) => void }) {
+  const ordered = [...content.pricing.plans].sort((a, b) => a.order - b.order);
+  const [selectedId, setSelectedId] = useState(ordered[0]?.id ?? "");
+  const selected = ordered.find((plan) => plan.id === selectedId) ?? ordered[0];
+
+  function commit(plans: PricingPlan[]) {
+    plans.forEach((plan, index) => { plan.order = index; });
+    onUpdate(["pricing", "plans"], plans as unknown as JsonValue);
+  }
+  function changePlan(change: (plan: PricingPlan) => void) {
+    const next = clone(ordered);
+    const plan = next.find((item) => item.id === selected?.id);
+    if (!plan) return;
+    change(plan);
+    commit(next);
+  }
+  function addPlan() {
+    const id = uniqueId("plan", ordered.map((plan) => plan.id));
+    const next: PricingPlan[] = [...ordered, { id, name: { en: "New plan", ar: "خطة جديدة" }, description: { en: "Describe who this plan is for.", ar: "اشرح لمن تناسب هذه الخطة." }, price: { monthly: "Custom", yearly: "Custom", currency: "SAR" }, billingPeriod: { en: "Tailored scope", ar: "نطاق مخصص" }, cta: { en: "Request a quote", ar: "اطلب عرض سعر" }, features: [], recommended: false, published: false, order: ordered.length }];
+    commit(next);
+    setSelectedId(id);
+  }
+  function movePlan(direction: -1 | 1) {
+    const index = ordered.findIndex((plan) => plan.id === selected?.id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= ordered.length) return;
+    const next = clone(ordered);
+    [next[index], next[target]] = [next[target], next[index]];
+    commit(next);
+  }
+  function deletePlan() {
+    if (!selected || !window.confirm(`Delete the pricing plan “${selected.name.en}”?`)) return;
+    const next = ordered.filter((plan) => plan.id !== selected.id);
+    commit(next);
+    setSelectedId(next[0]?.id ?? "");
+  }
+  function updateFeature(featureId: string, label: string) {
+    changePlan((plan) => { const feature = plan.features.find((item) => item.id === featureId); if (feature) feature.label[locale] = label; });
+  }
+  function moveFeature(featureId: string, direction: -1 | 1) {
+    changePlan((plan) => { const index = plan.features.findIndex((item) => item.id === featureId); const target = index + direction; if (index >= 0 && target >= 0 && target < plan.features.length) [plan.features[index], plan.features[target]] = [plan.features[target], plan.features[index]]; });
+  }
+
+  const page = content.pages.pricing[locale];
+  return <>
+    <PanelHeader title="Pricing" body="Manage bilingual page copy, plan prices, billing periods, feature lists, visibility, recommendations, and display order." action={<button className="admin-primary" type="button" onClick={addPlan}>Add plan</button>} />
+    <LocaleTabs locale={locale} onChange={onLocaleChange} />
+    <section className="admin-editor-section"><h3>Main pricing page heading</h3><div className="admin-object"><EditorField fieldKey="Signal" value={page.signal} onUpload={async () => null} onChange={(value) => onUpdate(["pages", "pricing", locale, "signal"], value)} /><EditorField fieldKey="CTA" value={page.cta ?? ""} onUpload={async () => null} onChange={(value) => onUpdate(["pages", "pricing", locale, "cta"], value)} /><EditorField fieldKey="Title" value={page.title} onUpload={async () => null} onChange={(value) => onUpdate(["pages", "pricing", locale, "title"], value)} /><EditorField fieldKey="Description" value={page.intro} onUpload={async () => null} onChange={(value) => onUpdate(["pages", "pricing", locale, "intro"], value)} /></div></section>
+    <section className="admin-editor-section"><div className="admin-section-title-row"><div><h3>Pricing plans</h3><p className="admin-editor-help">Only published plans appear publicly. Reordering here changes both languages.</p></div>{ordered.length ? <ResourceSelect value={selected?.id ?? ""} options={ordered.map((plan) => plan.id)} labels={Object.fromEntries(ordered.map((plan) => [plan.id, plan.name[locale]]))} onChange={setSelectedId} /> : null}</div>
+      {selected ? <div className="admin-plan-editor"><div className="admin-feature-toolbar"><label className="admin-check"><input type="checkbox" checked={selected.published} onChange={(event) => changePlan((plan) => { plan.published = event.target.checked; })} /><span>Published</span></label><label className="admin-check"><input type="checkbox" checked={selected.recommended} onChange={(event) => changePlan((plan) => { plan.recommended = event.target.checked; })} /><span>Recommended</span></label><div className="admin-order-actions"><button className="admin-secondary" type="button" onClick={() => movePlan(-1)}>Move up</button><button className="admin-secondary" type="button" onClick={() => movePlan(1)}>Move down</button><button className="admin-danger-link" type="button" onClick={deletePlan}>Delete plan</button></div></div>
+        <div className="admin-object"><label className="admin-field"><span>Plan name</span><input dir={locale === "ar" ? "rtl" : "ltr"} value={selected.name[locale]} onChange={(event) => changePlan((plan) => { plan.name[locale] = event.target.value; })} /></label><label className="admin-field"><span>Billing period</span><input dir={locale === "ar" ? "rtl" : "ltr"} value={selected.billingPeriod[locale]} onChange={(event) => changePlan((plan) => { plan.billingPeriod[locale] = event.target.value; })} /></label><label className="admin-field"><span>Description</span><textarea dir={locale === "ar" ? "rtl" : "ltr"} value={selected.description[locale]} onChange={(event) => changePlan((plan) => { plan.description[locale] = event.target.value; })} /></label><label className="admin-field"><span>CTA label</span><input dir={locale === "ar" ? "rtl" : "ltr"} value={selected.cta[locale]} onChange={(event) => changePlan((plan) => { plan.cta[locale] = event.target.value; })} /></label><label className="admin-field"><span>Monthly price</span><input value={selected.price.monthly} onChange={(event) => changePlan((plan) => { plan.price.monthly = event.target.value; })} /></label><label className="admin-field"><span>Yearly price</span><input value={selected.price.yearly} onChange={(event) => changePlan((plan) => { plan.price.yearly = event.target.value; })} /></label><label className="admin-field"><span>Currency</span><input value={selected.price.currency} onChange={(event) => changePlan((plan) => { plan.price.currency = event.target.value; })} /></label></div>
+        <div className="admin-plan-features"><div className="admin-section-title-row"><div><h3>Plan features</h3><p className="admin-editor-help">Switch languages above to edit each label separately.</p></div><button className="admin-inline-action" type="button" onClick={() => changePlan((plan) => { plan.features.push({ id: uniqueId("feature", plan.features.map((feature) => feature.id)), label: { en: "New feature", ar: "ميزة جديدة" } }); })}>Add feature</button></div>{selected.features.length ? selected.features.map((feature, index) => <div className="admin-reorder-row" key={feature.id}><input aria-label={`Plan feature ${index + 1}`} dir={locale === "ar" ? "rtl" : "ltr"} value={feature.label[locale]} onChange={(event) => updateFeature(feature.id, event.target.value)} /><button type="button" onClick={() => moveFeature(feature.id, -1)} aria-label="Move feature up">↑</button><button type="button" onClick={() => moveFeature(feature.id, 1)} aria-label="Move feature down">↓</button><button className="admin-danger-link" type="button" onClick={() => changePlan((plan) => { plan.features = plan.features.filter((item) => item.id !== feature.id); })}>Delete</button></div>) : <p className="admin-empty">No plan features yet. Add the first benefit for this plan.</p>}</div>
+      </div> : <p className="admin-empty">No pricing plans yet. Add a plan to begin.</p>}
+    </section>
+    <section className="admin-editor-section"><h3>Supporting pricing content</h3><ContentEditor value={content.pricing[locale] as unknown as JsonValue} onUpload={async () => null} onChange={(value) => onUpdate(["pricing", locale], value)} /></section>
+  </>;
+}
+
+const socialPlatforms: SocialPlatform[] = ["facebook", "instagram", "linkedin", "x", "youtube", "tiktok", "whatsapp"];
+
+function CommunicationSettings({ value, onChange }: { value: SiteContent["global"]; onChange: (value: SiteContent["global"]) => void }) {
+  function changeGlobal(mutator: (next: SiteContent["global"]) => void) { const next = clone(value); mutator(next); onChange(next); }
+  const normalizedPhone = normalizeWhatsappPhone(value.whatsapp.phone);
+  function moveSocial(index: number, direction: -1 | 1) { const target = index + direction; if (target < 0 || target >= value.socialLinks.length) return; changeGlobal((next) => { [next.socialLinks[index], next.socialLinks[target]] = [next.socialLinks[target], next.socialLinks[index]]; }); }
+  return <>
+    <section className="admin-editor-section"><h3>Floating WhatsApp button</h3><p className="admin-editor-help">Use an international number without an extension. The public link is generated with the localized default message.</p><div className="admin-object"><label className="admin-check"><input type="checkbox" checked={value.whatsapp.visible} onChange={(event) => changeGlobal((next) => { next.whatsapp.visible = event.target.checked; })} /><span>Show on public pages</span></label><label className="admin-field"><span>Button position</span><select value={value.whatsapp.position} onChange={(event) => changeGlobal((next) => { next.whatsapp.position = event.target.value as "auto" | "left" | "right"; })}><option value="auto">Automatic by language</option><option value="right">Bottom right</option><option value="left">Bottom left</option></select></label><label className="admin-field"><span>WhatsApp phone number</span><input inputMode="tel" value={value.whatsapp.phone} onChange={(event) => changeGlobal((next) => { next.whatsapp.phone = event.target.value; })} aria-invalid={!normalizedPhone} /><small className={normalizedPhone ? "admin-field-help" : "admin-form-error"}>{normalizedPhone ? `Link number: ${normalizedPhone}` : "Enter an international number such as +966112248822."}</small></label><label className="admin-field"><span>English default message</span><textarea value={value.whatsapp.message.en} onChange={(event) => changeGlobal((next) => { next.whatsapp.message.en = event.target.value; })} /></label><label className="admin-field" dir="rtl"><span>الرسالة العربية الافتراضية</span><textarea value={value.whatsapp.message.ar} onChange={(event) => changeGlobal((next) => { next.whatsapp.message.ar = event.target.value; })} /></label></div></section>
+    <section className="admin-editor-section"><div className="admin-section-title-row"><div><h3>Footer social media</h3><p className="admin-editor-help">Only enabled entries with valid web URLs appear in the footer.</p></div><button className="admin-inline-action" type="button" onClick={() => changeGlobal((next) => { next.socialLinks.push({ id: uniqueId("social", next.socialLinks.map((link) => link.id)), platform: "linkedin", url: "https://", enabled: false }); })}>Add platform</button></div>{value.socialLinks.length ? <div className="admin-social-list">{value.socialLinks.map((link, index) => <div className="admin-social-row" key={link.id}><label className="admin-check"><input type="checkbox" checked={link.enabled} onChange={(event) => changeGlobal((next) => { next.socialLinks[index].enabled = event.target.checked; })} /><span>Enabled</span></label><label className="admin-field"><span>Platform</span><select value={link.platform} onChange={(event) => changeGlobal((next) => { next.socialLinks[index].platform = event.target.value as SocialPlatform; })}>{socialPlatforms.map((platform) => <option key={platform} value={platform}>{titleFromKey(platform)}</option>)}</select></label><label className="admin-field"><span>Profile URL</span><input type="url" placeholder="https://" value={link.url} onChange={(event) => changeGlobal((next) => { next.socialLinks[index].url = event.target.value; })} /></label><div className="admin-order-actions"><button className="admin-secondary" type="button" onClick={() => moveSocial(index, -1)} aria-label="Move social link up">↑</button><button className="admin-secondary" type="button" onClick={() => moveSocial(index, 1)} aria-label="Move social link down">↓</button><button className="admin-danger-link" type="button" onClick={() => changeGlobal((next) => { next.socialLinks.splice(index, 1); })}>Remove</button></div></div>)}</div> : <p className="admin-empty">No social platforms have been added. Add one to show it in the footer.</p>}</section>
+  </>;
+}
+
 function LocaleTabs({ locale, onChange }: { locale: Locale; onChange: (value: Locale) => void }) {
   return <div className="admin-locale-tabs" role="tablist" aria-label="Content language"><button type="button" role="tab" aria-selected={locale === "en"} onClick={() => onChange("en")}>English</button><button type="button" role="tab" aria-selected={locale === "ar"} onClick={() => onChange("ar")}>العربية</button></div>;
 }
 
-function ResourceSelect({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) {
-  return <label className="admin-resource-select"><span>Choose item</span><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option value={option} key={option}>{titleFromKey(option)}</option>)}</select></label>;
+function ResourceSelect({ value, options, labels, onChange }: { value: string; options: string[]; labels?: Record<string, string>; onChange: (value: string) => void }) {
+  return <label className="admin-resource-select"><span>Choose item</span><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option value={option} key={option}>{labels?.[option] ?? titleFromKey(option)}</option>)}</select></label>;
 }
 
 function ResourceActions({
@@ -498,7 +619,7 @@ function NewResourceForm({
   const [slug, setSlug] = useState("");
   const [slugEdited, setSlugEdited] = useState(false);
   const [error, setError] = useState("");
-  const plural = kind === "product" ? "products" : "industries";
+  const plural = kind === "product" ? "products" : kind === "industry" ? "industries" : "features";
 
   function changeEnglishName(value: string) {
     setEnglishName(value);
@@ -528,8 +649,8 @@ function NewResourceForm({
         <button className="admin-danger-link" type="button" onClick={onCancel}>Cancel</button>
       </header>
       <div className="admin-create-grid">
-        <label className="admin-field"><span>English name</span><input autoFocus value={englishName} onChange={(event) => changeEnglishName(event.target.value)} placeholder={kind === "product" ? "UNU Field Service" : "Field services"} /></label>
-        <label className="admin-field" dir="rtl"><span>الاسم بالعربية</span><input value={arabicName} onChange={(event) => setArabicName(event.target.value)} placeholder={kind === "product" ? "UNU للخدمات الميدانية" : "الخدمات الميدانية"} /></label>
+        <label className="admin-field"><span>English name</span><input autoFocus value={englishName} onChange={(event) => changeEnglishName(event.target.value)} placeholder={kind === "product" ? "UNU Field Service" : kind === "feature" ? "Asset management" : "Field services"} /></label>
+        <label className="admin-field" dir="rtl"><span>الاسم بالعربية</span><input value={arabicName} onChange={(event) => setArabicName(event.target.value)} placeholder={kind === "product" ? "UNU للخدمات الميدانية" : kind === "feature" ? "إدارة الأصول" : "الخدمات الميدانية"} /></label>
         <label className="admin-field"><span>URL slug</span><input value={slug} onChange={(event) => { setSlugEdited(true); setSlug(slugifyResource(event.target.value)); }} placeholder="field-services" aria-describedby={`new-${kind}-path`} /></label>
         <div className="admin-resource-path" id={`new-${kind}-path`}><span>Public paths</span><code>/{plural}/{slug || "url-slug"}</code><code>/ar/{plural}/{slug || "url-slug"}</code></div>
       </div>

@@ -9,15 +9,17 @@ export type NavigationChild = {
 };
 
 export type NavigationGroup = {
+  id: string;
   label: string;
+  href: string;
   items: NavigationChild[];
 };
 
 const industryCategoryIndexes = [
-  { label: { en: "Production & infrastructure", ar: "الإنتاج والبنية التحتية" }, indexes: [0, 1, 3, 4, 5, 8, 11] },
-  { label: { en: "Technology & digital", ar: "التقنية والخدمات الرقمية" }, indexes: [6, 15, 16, 17, 18] },
-  { label: { en: "Commerce & experiences", ar: "التجارة والتجارب" }, indexes: [2, 12, 13, 14, 19, 20] },
-  { label: { en: "Services & mobility", ar: "الخدمات والتنقل" }, indexes: [7, 9, 10] },
+  { id: "production-infrastructure", label: { en: "Production & infrastructure", ar: "الإنتاج والبنية التحتية" }, indexes: [0, 1, 3, 4, 5, 8, 11] },
+  { id: "technology-digital", label: { en: "Technology & digital", ar: "التقنية والخدمات الرقمية" }, indexes: [6, 15, 16, 17, 18] },
+  { id: "commerce-experiences", label: { en: "Commerce & experiences", ar: "التجارة والتجارب" }, indexes: [2, 12, 13, 14, 19, 20] },
+  { id: "services-mobility", label: { en: "Services & mobility", ar: "الخدمات والتنقل" }, indexes: [7, 9, 10] },
 ] as const;
 
 function industryItems(locale: NavigationLocale): NavigationChild[] {
@@ -30,8 +32,11 @@ function industryItems(locale: NavigationLocale): NavigationChild[] {
 
 export function getIndustryNavigationGroups(locale: NavigationLocale): NavigationGroup[] {
   const items = industryItems(locale);
+  const prefix = locale === "ar" ? "/ar" : "";
   return industryCategoryIndexes.map((category) => ({
+    id: category.id,
     label: category.label[locale],
+    href: `${prefix}/industries#${category.id}`,
     items: category.indexes.map((index) => items[index]),
   }));
 }
@@ -56,7 +61,10 @@ export function getNavigationChildren(
   if (href === `${prefix}/industries`) {
     return [
       { label: isArabic ? "جميع القطاعات" : "All industries", href: `${prefix}/industries` },
-      ...industryItems(locale),
+      ...getIndustryNavigationGroups(locale).map(({ label, href: categoryHref }) => ({
+        label,
+        href: categoryHref,
+      })),
     ];
   }
 

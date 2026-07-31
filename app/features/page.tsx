@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { FeatureIcon } from "@/components/FeatureIcon";
+import { FeatureGroups } from "@/components/FeatureGroups";
 import { Page } from "@/components/Shell";
 import { PageHero } from "@/components/PageHero";
 import { readSiteContent } from "@/lib/site-content";
@@ -11,17 +10,7 @@ export default async function Features() {
   return (
     <Page content={site.global}>
       <PageHero variant="features" signal={page.signal} title={page.title} intro={page.intro} mediaSrc={site.media.featuresHero} cta={{ label: page.cta ?? "Book a tailored demo", href: "/contact" }} />
-      <section className="section"><div className="wrap content-index">
-        {Object.entries(site.features).map(([slug, item], index) => (
-          <Link href={`/features/${slug}`} key={slug}>
-            <span className="content-index-number">{String(index + 1).padStart(2, "0")}</span>
-            <FeatureIcon slug={slug} />
-            <h2>{item.en.name}</h2>
-            <p>{item.en.intro}</p>
-            <b>Explore {item.en.name}<i aria-hidden="true">→</i></b>
-          </Link>
-        ))}
-      </div></section>
+      <section className="section"><FeatureGroups items={Object.entries(site.features).filter(([, item]) => item.published).map(([slug, item]) => ({ slug, name: item.en.name, intro: item.en.intro, icon: item.icon, section: item.section, order: item.order }))} /></section>
     </Page>
   );
 }

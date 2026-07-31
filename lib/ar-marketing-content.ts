@@ -24,7 +24,7 @@ export type ArabicProductPage = {
     title: string;
     description: string;
   };
-  capabilities: { title: string; text: string }[];
+  capabilities: { title: string; text: string; icon?: string }[];
   features: string[];
   workflow: string[];
   integrations: string[];

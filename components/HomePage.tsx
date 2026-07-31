@@ -331,7 +331,7 @@ export function HomePage({
       <section className="industry-story">
         <div className="wrap industry-story-grid">
           <div className="industry-photo" data-reveal style={{ position: "relative" }}>
-            <Image src={media?.industriesHero ?? "/assets/hero-industries.webp"} alt={ar ? "فريق عمليات يستخدم بيانات مترابطة في مستودع" : "Operations team using connected data in a warehouse"} fill sizes="(max-width: 900px) 100vw, 50vw" />
+            <Image src={media?.industriesHero ?? "/assets/hero-industries.webp"} alt={ar ? "فريق عمليات يستخدم بيانات مترابطة في مستودع" : "Operations team using connected data in a warehouse"} fill loading="eager" sizes="(max-width: 900px) 100vw, 50vw" />
             <span>{ar ? "من أرض الواقع إلى لوحة الإدارة" : "From day-to-day operations to better decisions"}</span>
           </div>
           <div className="industry-story-copy" data-reveal>

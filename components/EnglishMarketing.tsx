@@ -7,6 +7,9 @@ import {
   type EnglishProductPage,
 } from "@/lib/en-marketing-content";
 import { WorkflowMarquee } from "@/components/WorkflowMarquee";
+import { ManagedIcon, suggestedIcon } from "@/components/ManagedIcon";
+import { PricingPlans } from "@/components/PricingPlans";
+import type { PricingPlan } from "@/lib/site-content";
 
 const Arrow = () => <span aria-hidden="true">↗</span>;
 
@@ -179,7 +182,7 @@ export function EnglishProductDetail({ page, image, imageAlt }: { page: EnglishP
         <div className="wrap">
           <header className="ar-section-head"><div><span>{page.name}</span><h2>{page.sectionTitle}</h2></div><p>{page.sectionIntro}</p></header>
           <div className="ar-capability-list">
-            {page.capabilities.map((capability, index) => <article key={capability.title}><span>0{index + 1}</span><h3>{capability.title}</h3><p>{capability.text}</p></article>)}
+            {page.capabilities.map((capability, index) => <article key={capability.title}><span className="capability-icon"><ManagedIcon name={capability.icon ?? suggestedIcon(capability.title, index)} /></span><h3>{capability.title}</h3><p>{capability.text}</p></article>)}
           </div>
         </div>
       </section>
@@ -243,7 +246,7 @@ function EnglishProductVideo({ page }: { page: EnglishProductPage }) {
   );
 }
 
-export function EnglishPricingPage({ pricing, pageContent }: { pricing?: { factors: string[]; planNames: string[]; note: string }; pageContent?: { signal: string; title: string; intro: string; cta?: string } }) {
+export function EnglishPricingPage({ pricing, pageContent }: { pricing?: { factors: string[]; planNames: string[]; note: string; plans?: PricingPlan[] }; pageContent?: { signal: string; title: string; intro: string; cta?: string } }) {
   const factors = [
     ["Users", "The expected level of concurrent access and the roles your teams require."],
     ["Required modules", "Accounting, people, inventory, sales, and other capabilities in your operating scope."],
@@ -251,11 +254,6 @@ export function EnglishPricingPage({ pricing, pageContent }: { pricing?: { facto
     ["Configuration", "Workflows, fields, permissions, and reports shaped around your organization."],
     ["Training and support", "The number of teams, training scope, and service level."],
     ["Hosting", "Cloud or private deployment options based on project requirements."],
-  ];
-  const plans = [
-    { name: "Starter", label: "For smaller businesses", items: ["Core modules", "A focused team", "Standard support"] },
-    { name: "Business", label: "For growing businesses", items: ["Multiple modules", "Selected integrations", "Advanced reporting"] },
-    { name: "Enterprise", label: "For complex organizations", items: ["Multiple branches", "Configured workflows", "Service agreement"] },
   ];
   return (
     <>
@@ -290,12 +288,7 @@ export function EnglishPricingPage({ pricing, pageContent }: { pricing?: { facto
         </div>
       </section>
 
-      <section className="section ar-plan-section">
-        <div className="wrap">
-          <header className="ar-section-head compact"><div><span>Choose a starting point</span><h2>Scope categories, not rigid price tiers</h2></div></header>
-          <div className="ar-plans">{plans.map((plan, index) => <article key={plan.name} className={index === 1 ? "is-featured" : ""}><span>{plan.label}</span><h3>{plan.name}</h3><ul>{plan.items.map((item) => <li key={item}>✓ {item}</li>)}</ul><a href="#quote" className="button secondary">Request a quote</a></article>)}</div>
-        </div>
-      </section>
+      <PricingPlans plans={pricing?.plans ?? []} locale="en" />
 
       <section className="section ar-process-section">
         <div className="wrap">

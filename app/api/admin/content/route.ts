@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin-auth";
 import { readSiteContent, type SiteContent } from "@/lib/site-content";
 import { createPublicServerClient } from "@/lib/supabase/server";
+import { validateSiteContent } from "@/lib/communication";
 
 export async function GET() {
   const auth = await requireAdmin();
@@ -24,6 +25,8 @@ export async function PUT(request: Request) {
   if (!content || content.version !== 1 || !content.global || !content.home || !content.products) {
     return NextResponse.json({ message: "Required website content sections are missing." }, { status: 400 });
   }
+  const validationError = validateSiteContent(content);
+  if (validationError) return NextResponse.json({ message: validationError }, { status: 400 });
 
   const supabase = await createPublicServerClient();
   if (!supabase) return NextResponse.json({ message: "Supabase is not configured." }, { status: 503 });

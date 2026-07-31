@@ -146,3 +146,26 @@ export function createIndustryResource(input: NewResourceInput): SiteContent["in
     image: "/assets/hero-industries.webp",
   };
 }
+
+export function createFeatureResource(input: NewResourceInput, order: number): SiteContent["features"][string] {
+  const englishName = input.englishName.trim();
+  const arabicName = input.arabicName.trim();
+  return {
+    icon: "workflow",
+    section: "business",
+    published: false,
+    order,
+    en: {
+      name: englishName,
+      headline: `${englishName} connected to the rest of your operation.`,
+      intro: `Explain how ${englishName} helps teams work with clearer, shared information.`,
+      benefits: ["Add the first operational benefit"],
+    },
+    ar: {
+      name: arabicName,
+      headline: `${arabicName} مترابط مع بقية عمليات مؤسستك.`,
+      intro: `اشرح كيف يساعد ${arabicName} الفرق على العمل ببيانات أوضح ومشتركة.`,
+      benefits: ["أضف الفائدة التشغيلية الأولى"],
+    },
+  };
+}

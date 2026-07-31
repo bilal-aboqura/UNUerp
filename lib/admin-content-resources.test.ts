@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createIndustryResource,
+  createFeatureResource,
   createProductResource,
   slugifyResource,
 } from "@/lib/admin-content-resources";
@@ -30,5 +31,12 @@ describe("admin content resources", () => {
     expect(industry.ar.name).toBe("UNU للخدمات الميدانية");
     expect(industry.en.intro).toHaveLength(3);
     expect(industry.ar.intro).toHaveLength(3);
+  });
+
+  it("creates an unpublished bilingual feature draft with managed ordering", () => {
+    const feature = createFeatureResource(input, 4);
+    expect(feature).toMatchObject({ published: false, order: 4, section: "business", icon: "workflow" });
+    expect(feature.en.name).toBe("UNU Field Service");
+    expect(feature.ar.name).toBe("UNU للخدمات الميدانية");
   });
 });

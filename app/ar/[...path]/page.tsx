@@ -16,6 +16,7 @@ import { arModules, arProducts, arIndustries } from "@/lib/ar-content";
 import { arabicIndustryCopy } from "@/lib/ar-marketing-content";
 import type { ArabicProductPage } from "@/lib/ar-marketing-content";
 import { readSiteContent } from "@/lib/site-content";
+import { FeatureGroups } from "@/components/FeatureGroups";
 
 const sectionCopy = {
   features: {
@@ -135,7 +136,7 @@ export default async function ArabicRoute({
   const site = await readSiteContent();
   const [section, slug] = path;
 
-  if (section === "pricing") return <Page locale="ar" content={site.global}><ArabicPricingPage pricing={site.pricing.ar} pageContent={site.pages.pricing.ar} /></Page>;
+  if (section === "pricing") return <Page locale="ar" content={site.global}><ArabicPricingPage pricing={{ ...site.pricing.ar, plans: site.pricing.plans }} pageContent={site.pages.pricing.ar} /></Page>;
 
   if (section === "contact")
     return (
@@ -183,13 +184,13 @@ export default async function ArabicRoute({
 
   const config = sectionCopy[section as keyof typeof sectionCopy];
   if (!config || section !== "features") return notFound();
-  const entries = Object.entries(site.features);
+  const entries = Object.entries(site.features).filter(([, item]) => item.published).sort((a, b) => a[1].order - b[1].order);
   const featuresPage = site.pages.features.ar;
   if (!slug)
     return (
       <Page locale="ar" content={site.global}>
         <PageHero locale="ar" variant="features" signal={featuresPage.signal} title={featuresPage.title} intro={featuresPage.intro} mediaSrc={site.media.featuresHero} />
-        <section className="section"><div className="wrap"><div className="content-index">{entries.map(([key, item], index) => <Link href={`/ar/features/${key}`} key={key}><span>{String(index + 1).padStart(2, "0")}</span><h2>{item.ar.name}</h2><p>{item.ar.intro}</p><b>استكشف <i aria-hidden="true">←</i></b></Link>)}</div></div></section>
+        <section className="section"><FeatureGroups locale="ar" items={entries.map(([key, item]) => ({ slug: key, name: item.ar.name, intro: item.ar.intro, icon: item.icon, section: item.section, order: item.order }))} /></section>
       </Page>
     );
   const index = entries.findIndex(([key]) => key === slug);

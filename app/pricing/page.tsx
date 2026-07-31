@@ -4,5 +4,5 @@ import { readSiteContent } from "@/lib/site-content";
 
 export default async function Pricing() {
   const site = await readSiteContent();
-  return <Page content={site.global}><EnglishPricingPage pricing={site.pricing.en} pageContent={site.pages.pricing.en} /></Page>;
+  return <Page content={site.global}><EnglishPricingPage pricing={{ ...site.pricing.en, plans: site.pricing.plans }} pageContent={site.pages.pricing.en} /></Page>;
 }
